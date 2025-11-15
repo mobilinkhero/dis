@@ -445,14 +445,14 @@
 
                     <div class="flex space-x-3">
                         <a 
-                            href="{{ route('tenant.products.list') }}"
+                            href="{{ tenant_route('tenant.products.list') }}"
                             class="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium text-center transition-colors"
                         >
                             📦 Manage Products
                         </a>
                         
                         <a 
-                            href="{{ route('tenant.orders.list') }}"
+                            href="{{ tenant_route('tenant.orders.list') }}"
                             class="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium text-center transition-colors"
                         >
                             📋 View Orders

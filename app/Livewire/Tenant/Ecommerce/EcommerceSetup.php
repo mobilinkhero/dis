@@ -116,40 +116,38 @@ class EcommerceSetup extends Component
 
     public function saveConfiguration()
     {
+        // Validate before saving
+        $this->validate([
+            'isEnabled' => 'required|boolean',
+            'productSheetsUrl' => 'required_if:isEnabled,true|url',
+            'orderSheetsUrl' => 'nullable|url',
+        ]);
+
         try {
             DB::transaction(function () {
+                $data = [
+                    'tenant_id' => tenant_id(),
+                    'is_enabled' => $this->isEnabled,
+                    'google_sheets_product_url' => $this->productSheetsUrl,
+                    'google_sheets_order_url' => $this->orderSheetsUrl ?: null,
+                    'sync_settings' => $this->syncSettings,
+                ];
+
                 // Create or update EcommerceBot
                 if ($this->ecommerceBot) {
-                    $this->ecommerceBot->update([
-                        'is_enabled' => $this->isEnabled,
-                        'google_sheets_product_url' => $this->productSheetsUrl,
-                        'google_sheets_order_url' => $this->orderSheetsUrl ?: null,
-                        'sync_settings' => $this->syncSettings,
-                        'upselling_rules' => $this->ecommerceBot->getDefaultUpsellingRules(),
-                        'reminder_settings' => $this->ecommerceBot->getDefaultReminderSettings(),
-                    ]);
+                    $this->ecommerceBot->update($data);
                 } else {
-                    $this->ecommerceBot = EcommerceBot::create([
-                        'tenant_id' => tenant_id(),
-                        'is_enabled' => $this->isEnabled,
-                        'google_sheets_product_url' => $this->productSheetsUrl,
-                        'google_sheets_order_url' => $this->orderSheetsUrl ?: null,
-                        'sync_settings' => $this->syncSettings,
-                        'upselling_rules' => (new EcommerceBot)->getDefaultUpsellingRules(),
-                        'reminder_settings' => (new EcommerceBot)->getDefaultReminderSettings(),
-                    ]);
+                    $this->ecommerceBot = EcommerceBot::create($data);
                 }
 
                 // Extract and save sheet IDs
-                $sheetsService = new GoogleSheetsEcommerceService($this->ecommerceBot);
-                
                 if ($this->productSheetsUrl) {
-                    $productSheetsId = $sheetsService->extractSheetsId($this->productSheetsUrl);
+                    $productSheetsId = $this->extractSheetsId($this->productSheetsUrl);
                     $this->ecommerceBot->update(['sheets_product_id' => $productSheetsId]);
                 }
 
                 if ($this->orderSheetsUrl) {
-                    $orderSheetsId = $sheetsService->extractSheetsId($this->orderSheetsUrl);
+                    $orderSheetsId = $this->extractSheetsId($this->orderSheetsUrl);
                     $this->ecommerceBot->update(['sheets_order_id' => $orderSheetsId]);
                 }
             });
@@ -158,8 +156,17 @@ class EcommerceSetup extends Component
             $this->notify(['type' => 'success', 'message' => 'E-commerce bot configured successfully!']);
 
         } catch (\Exception $e) {
+            \Log::error('EcommerceSetup saveConfiguration error: ' . $e->getMessage());
             $this->notify(['type' => 'danger', 'message' => 'Configuration failed: ' . $e->getMessage()]);
         }
+    }
+
+    private function extractSheetsId($url)
+    {
+        if (preg_match('/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/', $url, $matches)) {
+            return $matches[1];
+        }
+        return null;
     }
 
     public function performInitialSync()
@@ -218,7 +225,15 @@ class EcommerceSetup extends Component
 
     public function goToStep($step)
     {
+        $allowedSteps = ['setup', 'validate', 'configure', 'complete'];
+        
+        if (!in_array($step, $allowedSteps)) {
+            $this->notify(['type' => 'danger', 'message' => 'Invalid step: ' . $step]);
+            return;
+        }
+
         $this->currentStep = $step;
+        $this->notify(['type' => 'info', 'message' => 'Moved to step: ' . ucfirst($step)]);
     }
 
     private function getDefaultSyncSettings(): array
