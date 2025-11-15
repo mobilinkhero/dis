@@ -342,7 +342,6 @@ function closeWhatsAppPanel() {
 function openOrderManagement() {
     // Navigate to order management page (placeholder for future implementation)
     alert('📦 Order Management: This feature will show customer orders, tracking, and fulfillment status. Coming soon!');
-    // window.location.href = '{{ route("tenant.orders.index") }}'; // TODO: Create orders route
 }
 
 // WhatsApp Integration functions
