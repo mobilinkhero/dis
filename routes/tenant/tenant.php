@@ -118,7 +118,7 @@ Route::middleware(['auth', TenantMiddleware::class, CheckTenantDeleted::class, E
             Route::get('canned-reply', ManageCannedReply::class)->name('canned-reply');
 
             // Product Sales
-            Route::get('/product-sales', [\App\Livewire\Tenant\ProductSales\ProductSalesDashboard::class, '__invoke'])->name('product-sales.index');
+            Route::get('/product-sales', \App\Livewire\Tenant\ProductSales\ProductSalesDashboard::class)->name('product-sales.index');
 
             // Staff & Profile
             Route::get('/staff', StaffList::class)->name('staff.list');

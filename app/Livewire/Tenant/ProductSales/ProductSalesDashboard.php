@@ -6,7 +6,6 @@ use App\Models\Tenant\Contact;
 use App\Models\Tenant\Order;
 use App\Models\Tenant\Product;
 use App\Services\FeatureService;
-use App\Traits\BelongsToTenant;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -14,7 +13,7 @@ use Livewire\WithPagination;
 
 class ProductSalesDashboard extends Component
 {
-    use WithPagination, BelongsToTenant;
+    use WithPagination;
 
     public $selectedPeriod = '30';
     public $searchTerm = '';

@@ -96,7 +96,7 @@ class ProductSalesController extends Controller
                     'tenant_id' => tenant_id(),
                     'phone' => $request->contact_phone,
                     'name' => $request->contact_name ?? 'WhatsApp Customer',
-                    'source_id' => getSourceId('WhatsApp Sales'),
+                    'source_id' => $this->getOrCreateSourceId('WhatsApp Sales'),
                 ]);
             }
 
@@ -320,5 +320,27 @@ class ProductSalesController extends Controller
                 ];
             })
             ->toArray();
+    }
+
+    /**
+     * Get or create source ID for WhatsApp Sales
+     */
+    private function getOrCreateSourceId(string $sourceName): ?int
+    {
+        // First try to find existing source
+        $source = \App\Models\Tenant\Source::where('tenant_id', tenant_id())
+            ->where('name', $sourceName)
+            ->first();
+
+        if (!$source) {
+            // Create new source if it doesn't exist
+            $source = \App\Models\Tenant\Source::create([
+                'tenant_id' => tenant_id(),
+                'name' => $sourceName,
+                'description' => 'Automatically created for product sales',
+            ]);
+        }
+
+        return $source->id;
     }
 }
