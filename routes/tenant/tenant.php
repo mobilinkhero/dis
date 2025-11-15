@@ -113,12 +113,16 @@ Route::middleware(['auth', TenantMiddleware::class, CheckTenantDeleted::class, E
             Route::get('/activity-log', ActivityLogList::class)->name('activity-log.list');
             Route::get('/activity-log/{logId?}', ActivityLogDetails::class)->name('activity-log.details');
 
+            // E-commerce Routes
+            Route::get('/ecommerce/setup', \App\Livewire\Tenant\Ecommerce\EcommerceSetup::class)->name('ecommerce.setup');
+            Route::get('/products', \App\Livewire\Tenant\Ecommerce\ProductManagement::class)->name('products.list');
+            Route::get('/orders', \App\Livewire\Tenant\Ecommerce\OrderManagement::class)->name('orders.list');
+            Route::get('/ecommerce/upselling', \App\Livewire\Tenant\Ecommerce\UpsellCampaigns::class)->name('ecommerce.upselling');
+            Route::get('/ecommerce/analytics', \App\Livewire\Tenant\Ecommerce\SalesAnalytics::class)->name('ecommerce.analytics');
+
             // Chat
             Route::get('ai-prompt', ManageAiPrompt::class)->name('ai-prompt');
             Route::get('canned-reply', ManageCannedReply::class)->name('canned-reply');
-
-            // Product Sales
-            Route::get('/product-sales', \App\Livewire\Tenant\ProductSales\ProductSalesDashboard::class)->name('product-sales.index');
 
             // Staff & Profile
             Route::get('/staff', StaffList::class)->name('staff.list');

@@ -181,11 +181,6 @@ class PermissionSeeder extends Seeder
             'tenant.bot_flow.create',
             'tenant.bot_flow.edit',
             'tenant.bot_flow.delete',
-
-            'tenant.product_sales.view',
-            'tenant.product_sales.create',
-            'tenant.product_sales.edit',
-            'tenant.product_sales.delete',
         ];
 
         // Create admin permissions
