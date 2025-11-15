@@ -312,7 +312,7 @@
                     verifyPayment(response);
                 },
                 prefill: {
-                    name: '{{ getUserByTenantId(tenant_id())->firstname }} {{ getUserByTenantId(tenant_id())->lastname }}',
+                    name: '{{ getUserByTenantId(tenant_id())->name ?? getUserByTenantId(tenant_id())->email ?? "User" }}',
                     email: '{{ getUserByTenantId(tenant_id())->email }}'
                 },
                 theme: {
