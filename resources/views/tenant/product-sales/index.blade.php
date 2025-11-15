@@ -1,8 +1,7 @@
 {{-- Product Sales Management - Top-notch e-commerce interface --}}
-@extends('layouts.app')
-
-@section('title', 'Product Sales')
-
+<x-layouts.app>
+    <x-slot:title>Product Sales</x-slot:title>
+    
 @push('styles')
 <style>
     .product-sales-container {
@@ -36,8 +35,6 @@
     }
 </style>
 @endpush
-
-@section('content')
 <div class="product-sales-container">
     <div class="container mx-auto px-4 py-8">
         {{-- Header Section --}}
@@ -411,3 +408,4 @@ document.addEventListener('keydown', function(e) {
 });
 </script>
 @endpush
+</x-layouts.app>
