@@ -48,6 +48,7 @@ use App\Livewire\Tenant\Settings\Language\TenantTranslationManager;
 use App\Livewire\Tenant\Staff\StaffCreator;
 use App\Livewire\Tenant\Staff\StaffDetails;
 use App\Livewire\Tenant\Staff\StaffList;
+use App\Http\Controllers\Tenant\ProductSalesController;
 use App\Livewire\Tenant\Subscription\Dashboard as subscription_dashboard;
 use App\Livewire\Tenant\Template\TemplateList;
 use App\Livewire\Tenant\TenantSubscription\BillingDetails;
@@ -278,6 +279,22 @@ Route::middleware(['auth', TenantMiddleware::class, CheckTenantDeleted::class, E
             Route::post('/coupons/validate', [CouponController::class, 'validate'])->name('coupon.validate');
             Route::post('/coupons/apply', [CouponController::class, 'apply'])->name('coupon.apply');
             Route::post('/coupons/remove', [CouponController::class, 'remove'])->name('coupon.remove');
+
+            // Product Sales Routes
+            Route::prefix('product-sales')->name('product-sales.')->group(function () {
+                Route::get('/', [ProductSalesController::class, 'index'])->name('index');
+                Route::get('/products', [ProductSalesController::class, 'getProducts'])->name('products');
+                Route::get('/recommendations', [ProductSalesController::class, 'getRecommendations'])->name('recommendations');
+                Route::post('/checkout', [ProductSalesController::class, 'processCheckout'])->name('checkout');
+                Route::post('/send-catalog', [ProductSalesController::class, 'sendCatalogViaWhatsApp'])->name('send-catalog');
+            });
+
+            // API Routes for Product Sales AJAX calls
+            Route::prefix('api/products')->name('api.products.')->group(function () {
+                Route::get('/search', [ProductSalesController::class, 'getProducts'])->name('search');
+                Route::get('/recommendations/{type}', [ProductSalesController::class, 'getRecommendations'])->name('recommendations');
+                Route::post('/ai-recommendations', [ProductSalesController::class, 'getRecommendations'])->name('ai-recommendations');
+            });
         });
         // Route without 'sanitize.inputs'
         Route::post('send-message', [WhatsAppWebhookController::class, 'send_message'])->name('send_message');
