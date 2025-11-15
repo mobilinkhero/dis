@@ -51,7 +51,7 @@ class ProductSalesDashboard extends Component
         }
 
         // Check feature access
-        if (!$this->featureService->hasFeature('product_sales')) {
+        if (!$this->featureService->hasAccess('product_sales')) {
             $this->notify(['type' => 'warning', 'message' => t('feature_not_available_in_current_plan')], true);
             return redirect()->to(tenant_route('tenant.dashboard'));
         }
