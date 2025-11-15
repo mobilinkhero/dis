@@ -349,7 +349,7 @@ function sendCatalogViaWhatsApp(connectionId) {
     const phone = prompt('Enter customer phone number:');
     if (!phone) return;
     
-    fetch('{{ route("tenant.product-sales.send-catalog") }}', {
+    fetch('{{ tenant_route("tenant.product-sales.send-catalog") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -376,7 +376,7 @@ function sendCatalogViaWhatsApp(connectionId) {
 
 function viewWhatsAppChats(connectionId) {
     // Navigate to WhatsApp chats (using existing chat route)
-    window.location.href = `{{ route("tenant.chat") }}?connection=${connectionId}`;
+    window.location.href = `{{ tenant_route("tenant.chat") }}?connection=${connectionId}`;
 }
 
 // Quick Action functions
