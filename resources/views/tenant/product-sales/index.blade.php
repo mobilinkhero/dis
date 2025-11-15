@@ -340,8 +340,9 @@ function closeWhatsAppPanel() {
 }
 
 function openOrderManagement() {
-    // Navigate to order management page
-    window.location.href = '{{ route("tenant.orders.index") }}';
+    // Navigate to order management page (placeholder for future implementation)
+    alert('📦 Order Management: This feature will show customer orders, tracking, and fulfillment status. Coming soon!');
+    // window.location.href = '{{ route("tenant.orders.index") }}'; // TODO: Create orders route
 }
 
 // WhatsApp Integration functions
@@ -375,8 +376,8 @@ function sendCatalogViaWhatsApp(connectionId) {
 }
 
 function viewWhatsAppChats(connectionId) {
-    // Navigate to WhatsApp chats
-    window.location.href = `{{ route("tenant.chats.index") }}?connection=${connectionId}`;
+    // Navigate to WhatsApp chats (using existing chat route)
+    window.location.href = `{{ route("tenant.chat") }}?connection=${connectionId}`;
 }
 
 // Quick Action functions
