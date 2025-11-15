@@ -67,6 +67,19 @@ return [
             'external' => false,
         ],
 
+        'product_sales' => [
+            'type' => 'item',
+            'label' => 'product_sales',
+            'route' => 'tenant.product-sales.index',
+            'icon' => 'heroicon-o-shopping-cart',
+            'permission' => 'tenant.product_sales.view',
+            'order' => 4.5,
+            'active_routes' => ['tenant.product-sales.*'],
+            'feature_required' => 'product_sales',
+            'badge' => null,
+            'external' => false,
+        ],
+
         'sales_section' => [
             'type' => 'section',
             'label' => 'my_subscription',
