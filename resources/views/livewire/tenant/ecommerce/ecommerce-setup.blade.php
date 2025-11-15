@@ -66,14 +66,30 @@
         <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">📊 Connect Google Sheets</h2>
             
+            {{-- Debug Info --}}
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <p class="text-xs text-yellow-800">
+                    <strong>Debug:</strong> isEnabled = {{ $isEnabled ? 'true' : 'false' }} | 
+                    Current Step = {{ $currentStep }} | 
+                    Component Loaded = ✅
+                </p>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {{-- Setup Form --}}
                 <div class="space-y-6">
                     <div>
                         <label class="flex items-center">
-                            <input type="checkbox" wire:model="isEnabled" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            <input type="checkbox" wire:model.live="isEnabled" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
                             <span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">Enable E-commerce Bot</span>
                         </label>
+                        <p class="text-xs text-gray-500 mt-1">
+                            @if($isEnabled)
+                                ✅ E-commerce bot is enabled - configure your sheets below
+                            @else
+                                ℹ️ Check this box to enable e-commerce automation
+                            @endif
+                        </p>
                     </div>
 
                     @if($isEnabled)

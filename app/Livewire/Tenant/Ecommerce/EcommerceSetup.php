@@ -59,6 +59,16 @@ class EcommerceSetup extends Component
         }
     }
 
+    public function updatedIsEnabled($value)
+    {
+        // This method is called when isEnabled property changes
+        if ($value) {
+            $this->notify(['type' => 'success', 'message' => 'E-commerce bot enabled! Configure your Google Sheets below.']);
+        } else {
+            $this->notify(['type' => 'info', 'message' => 'E-commerce bot disabled.']);
+        }
+    }
+
     public function validateGoogleSheets()
     {
         $this->validate();
