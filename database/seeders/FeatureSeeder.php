@@ -23,7 +23,6 @@ class FeatureSeeder extends Seeder
             ['name' => 'Staff ', 'slug' => 'staff', 'description' => 'Number of staffs allowed', 'type' => 'limit', 'display_order' => 70, 'default' => false],
             ['name' => 'Conversation ', 'slug' => 'conversations', 'description' => 'Number of conversation allowed', 'type' => 'limit', 'display_order' => 80, 'default' => false],
             ['name' => 'Bot Flow ', 'slug' => 'bot_flow', 'description' => 'Number of bot flows allowed', 'type' => 'limit', 'display_order' => 90, 'default' => false],
-            ['name' => 'Product Sales ', 'slug' => 'product_sales', 'description' => 'Enable product sales and e-commerce features', 'type' => 'limit', 'display_order' => 95, 'default' => false],
             ['name' => 'Enable Api ', 'slug' => 'enable_api', 'description' => 'Enable(-1) or Disable(0) Api', 'type' => 'limit', 'display_order' => 100, 'default' => false],
         ];
 

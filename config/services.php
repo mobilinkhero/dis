@@ -35,12 +35,4 @@ return [
         ],
     ],
 
-    'google_sheets' => [
-        'api_key' => env('GOOGLE_SHEETS_API_KEY'),
-        'spreadsheet_id' => env('GOOGLE_SHEETS_SPREADSHEET_ID'),
-        'orders_range' => env('GOOGLE_SHEETS_ORDERS_RANGE', 'Orders!A:Z'),
-        'products_range' => env('GOOGLE_SHEETS_PRODUCTS_RANGE', 'Products!A:Z'),
-        'customers_range' => env('GOOGLE_SHEETS_CUSTOMERS_RANGE', 'Customers!A:Z'),
-    ],
-
 ];
