@@ -1,5 +1,5 @@
 {{-- Product Sales Management - Top-notch e-commerce interface --}}
-@extends('tenant.layouts.app')
+@extends('layouts.app')
 
 @section('title', 'Product Sales')
 
