@@ -141,6 +141,27 @@ return [
             ],
         ],
 
+        'sales_section_main' => [
+            'type' => 'section',
+            'label' => 'sales_and_ecommerce',
+            'icon' => null,
+            'permission' => ['tenant.product_sales.view'],
+            'order' => 7.5,
+            'section_id' => 'sales_ecommerce',
+            'children' => [
+                'product_sales' => [
+                    'type' => 'item',
+                    'label' => 'product_sales',
+                    'route' => 'tenant.product-sales.index',
+                    'icon' => 'heroicon-o-shopping-cart',
+                    'permission' => 'tenant.product_sales.view',
+                    'order' => 1,
+                    'active_routes' => ['tenant.product-sales.*'],
+                    'feature_required' => 'product_sales',
+                ],
+            ],
+        ],
+
         'marketing_section' => [
             'type' => 'section',
             'label' => 'marketing',
