@@ -2,284 +2,267 @@
 
 namespace App\Livewire\Tenant\Ecommerce;
 
-use App\Models\Tenant\EcommerceBot;
-use App\Services\GoogleSheetsEcommerceService;
-use App\Rules\PurifiedInput;
+use App\Models\Tenant\EcommerceConfiguration;
+use App\Services\GoogleSheetsService;
 use Livewire\Component;
-use Illuminate\Support\Facades\DB;
 
 class EcommerceSetup extends Component
 {
-    public ?EcommerceBot $ecommerceBot = null;
-    public bool $isEnabled = false;
-    public string $productSheetsUrl = '';
-    public string $orderSheetsUrl = '';
-    public array $productValidation = [];
-    public array $orderValidation = [];
-    public array $syncSettings = [];
-    public bool $showAdvancedSettings = false;
-    public string $currentStep = 'setup'; // setup, validate, configure, complete
-    public array $validationResults = [];
+    public $currentStep = 1;
+    public $totalSteps = 4;
 
-    protected function rules()
-    {
-        return [
-            'isEnabled' => 'boolean',
-            'productSheetsUrl' => [
-                'required_if:isEnabled,true',
-                'url',
-                new PurifiedInput('Invalid URL format'),
-            ],
-            'orderSheetsUrl' => [
-                'nullable',
-                'url', 
-                new PurifiedInput('Invalid URL format'),
-            ],
-        ];
-    }
+    // Step 1: Google Sheets Configuration
+    public $googleSheetsUrl = '';
+    public $createNewSheets = false;
+    
+    // Step 2: Sheet Verification
+    public $sheetsValid = false;
+    public $sheetValidationMessage = '';
+    public $extractedSheetId = '';
+    
+    // Step 3: Payment & Settings Configuration
+    public $paymentMethods = [];
+    public $currency = 'USD';
+    public $taxRate = 10.0;
+    public $shippingEnabled = true;
+    public $defaultShippingCost = 0;
+    
+    // Step 4: AI & Automation Settings
+    public $aiRecommendationsEnabled = true;
+    public $abandonedCartEnabled = true;
+    public $upsellingEnabled = true;
+    public $orderConfirmationMessage = '';
+    public $paymentConfirmationMessage = '';
+
+    protected $rules = [
+        'googleSheetsUrl' => 'required|url',
+        'currency' => 'required|string|max:3',
+        'taxRate' => 'numeric|min:0|max:100',
+        'defaultShippingCost' => 'numeric|min:0',
+        'orderConfirmationMessage' => 'nullable|string|max:1000',
+        'paymentConfirmationMessage' => 'nullable|string|max:1000',
+    ];
 
     public function mount()
     {
         // Check permissions
-        if (!checkPermission('tenant.ecommerce.setup')) {
+        if (!checkPermission('tenant.ecommerce.view')) {
             $this->notify(['type' => 'danger', 'message' => t('access_denied_note')], true);
             return redirect()->to(tenant_route('tenant.dashboard'));
         }
 
-        // Load existing configuration
-        $this->ecommerceBot = EcommerceBot::where('tenant_id', tenant_id())->first();
-        
-        if ($this->ecommerceBot) {
-            $this->isEnabled = $this->ecommerceBot->is_enabled;
-            $this->productSheetsUrl = $this->ecommerceBot->google_sheets_product_url ?? '';
-            $this->orderSheetsUrl = $this->ecommerceBot->google_sheets_order_url ?? '';
-            $this->syncSettings = $this->ecommerceBot->sync_settings ?? $this->getDefaultSyncSettings();
-            
-            // If bot is already configured and enabled, show completed state
-            if ($this->ecommerceBot->is_enabled && $this->ecommerceBot->google_sheets_product_url) {
-                $this->currentStep = 'complete';
-                $this->notify(['type' => 'info', 'message' => 'E-commerce bot is already configured and active!']);
-            }
+        // Check if already configured
+        $config = EcommerceConfiguration::where('tenant_id', tenant_id())->first();
+        if ($config && $config->isFullyConfigured()) {
+            return redirect()->route('tenant.ecommerce.dashboard');
+        }
+
+        // Load existing configuration if any
+        if ($config) {
+            $this->loadExistingConfig($config);
         } else {
-            $this->syncSettings = $this->getDefaultSyncSettings();
+            $this->setDefaultValues();
         }
     }
 
-    public function updatedIsEnabled($value)
+    public function loadExistingConfig($config)
     {
-        // This method is called when isEnabled property changes
-        if ($value) {
-            $this->notify(['type' => 'success', 'message' => 'E-commerce bot enabled! Configure your Google Sheets below.']);
-        } else {
-            $this->notify(['type' => 'info', 'message' => 'E-commerce bot disabled.']);
+        $this->googleSheetsUrl = $config->google_sheets_url ?? '';
+        $this->paymentMethods = $config->payment_methods ?? [];
+        $this->currency = $config->currency ?? 'USD';
+        $this->taxRate = $config->tax_rate ?? 10.0;
+        $this->aiRecommendationsEnabled = $config->ai_recommendations_enabled ?? true;
+        $this->orderConfirmationMessage = $config->order_confirmation_message ?? '';
+        $this->paymentConfirmationMessage = $config->payment_confirmation_message ?? '';
+    }
+
+    public function setDefaultValues()
+    {
+        $this->paymentMethods = ['cash_on_delivery', 'bank_transfer'];
+        $this->orderConfirmationMessage = 'Thank you for your order! Your order #{order_number} has been confirmed. We will process it shortly.';
+        $this->paymentConfirmationMessage = 'Payment received! Your order #{order_number} totaling {total_amount} has been confirmed. Tracking details will be shared soon.';
+    }
+
+    public function nextStep()
+    {
+        if ($this->currentStep == 1) {
+            $this->validateStep1();
+        } elseif ($this->currentStep == 2) {
+            $this->validateStep2();
+        } elseif ($this->currentStep == 3) {
+            $this->validateStep3();
+        } elseif ($this->currentStep == 4) {
+            $this->completeSetup();
+            return;
+        }
+
+        if ($this->currentStep < $this->totalSteps) {
+            $this->currentStep++;
         }
     }
 
-    public function validateGoogleSheets()
+    public function previousStep()
     {
-        $this->validate();
-
-        try {
-            $this->validationResults = [];
-
-            // Create temporary EcommerceBot for validation
-            $tempBot = new EcommerceBot([
-                'tenant_id' => tenant_id(),
-                'google_sheets_product_url' => $this->productSheetsUrl,
-                'google_sheets_order_url' => $this->orderSheetsUrl,
-            ]);
-
-            $sheetsService = new GoogleSheetsEcommerceService($tempBot);
-
-            // Validate product sheet
-            if ($this->productSheetsUrl) {
-                $this->validationResults['products'] = $sheetsService->validateSheetsUrl($this->productSheetsUrl);
-            }
-
-            // Validate order sheet if provided
-            if ($this->orderSheetsUrl) {
-                $this->validationResults['orders'] = $sheetsService->validateSheetsUrl($this->orderSheetsUrl);
-            }
-
-            if (empty($this->validationResults)) {
-                $this->notify(['type' => 'danger', 'message' => 'Please provide at least a product sheet URL']);
-                return;
-            }
-
-            $allValid = collect($this->validationResults)->every(fn($result) => $result['success']);
-
-            if ($allValid) {
-                $this->currentStep = 'configure';
-                $this->notify(['type' => 'success', 'message' => 'Google Sheets validated successfully!']);
-            } else {
-                $this->notify(['type' => 'danger', 'message' => 'Please fix the validation errors before proceeding']);
-            }
-
-        } catch (\Exception $e) {
-            $this->notify(['type' => 'danger', 'message' => 'Validation failed: ' . $e->getMessage()]);
+        if ($this->currentStep > 1) {
+            $this->currentStep--;
         }
     }
 
-    public function saveConfiguration()
+    public function validateStep1()
     {
-        // Validate before saving
         $this->validate([
-            'isEnabled' => 'required|boolean',
-            'productSheetsUrl' => 'required_if:isEnabled,true|url',
-            'orderSheetsUrl' => 'nullable|url',
+            'googleSheetsUrl' => 'required|url'
+        ]);
+
+        // Validate Google Sheets URL
+        $sheetsService = new GoogleSheetsService();
+        $validation = $sheetsService->validateSheetsUrl($this->googleSheetsUrl);
+
+        if (!$validation['valid']) {
+            $this->addError('googleSheetsUrl', $validation['message']);
+            return;
+        }
+
+        $this->extractedSheetId = $validation['sheet_id'];
+        $this->sheetsValid = true;
+        $this->sheetValidationMessage = $validation['message'];
+    }
+
+    public function validateStep2()
+    {
+        if (!$this->sheetsValid) {
+            $this->addError('googleSheetsUrl', 'Please validate your Google Sheets URL first');
+            $this->currentStep = 1;
+            return;
+        }
+    }
+
+    public function validateStep3()
+    {
+        $this->validate([
+            'currency' => 'required|string|max:3',
+            'taxRate' => 'numeric|min:0|max:100',
+            'defaultShippingCost' => 'numeric|min:0',
+        ]);
+
+        if (empty($this->paymentMethods)) {
+            $this->addError('paymentMethods', 'Please select at least one payment method');
+            return;
+        }
+    }
+
+    public function togglePaymentMethod($method)
+    {
+        if (in_array($method, $this->paymentMethods)) {
+            $this->paymentMethods = array_diff($this->paymentMethods, [$method]);
+        } else {
+            $this->paymentMethods[] = $method;
+        }
+    }
+
+    public function createDefaultSheets()
+    {
+        $this->createNewSheets = true;
+        
+        $sheetsService = new GoogleSheetsService();
+        $structure = $sheetsService->createDefaultSheets();
+        
+        $this->notify([
+            'type' => 'info', 
+            'message' => 'Please create the required sheets in your Google Sheets document and make sure they are publicly viewable.'
+        ]);
+    }
+
+    public function completeSetup()
+    {
+        $this->validate([
+            'orderConfirmationMessage' => 'nullable|string|max:1000',
+            'paymentConfirmationMessage' => 'nullable|string|max:1000',
         ]);
 
         try {
-            DB::transaction(function () {
-                $data = [
-                    'tenant_id' => tenant_id(),
-                    'is_enabled' => $this->isEnabled,
-                    'google_sheets_product_url' => $this->productSheetsUrl,
-                    'google_sheets_order_url' => $this->orderSheetsUrl ?: null,
-                    'sync_settings' => $this->syncSettings,
-                ];
+            // Create or update configuration
+            $config = EcommerceConfiguration::updateOrCreate(
+                ['tenant_id' => tenant_id()],
+                [
+                    'is_configured' => true,
+                    'google_sheets_url' => $this->googleSheetsUrl,
+                    'products_sheet_id' => $this->extractedSheetId,
+                    'orders_sheet_id' => $this->extractedSheetId,
+                    'customers_sheet_id' => $this->extractedSheetId,
+                    'payment_methods' => $this->paymentMethods,
+                    'currency' => $this->currency,
+                    'tax_rate' => $this->taxRate,
+                    'shipping_settings' => [
+                        'enabled' => $this->shippingEnabled,
+                        'default_cost' => $this->defaultShippingCost,
+                    ],
+                    'abandoned_cart_settings' => [
+                        'enabled' => $this->abandonedCartEnabled,
+                        'delay_hours' => [1, 6, 24],
+                        'discount_percentage' => [0, 5, 10],
+                    ],
+                    'upselling_settings' => [
+                        'enabled' => $this->upsellingEnabled,
+                        'cross_sell_enabled' => true,
+                        'minimum_order_value' => 0,
+                    ],
+                    'ai_recommendations_enabled' => $this->aiRecommendationsEnabled,
+                    'order_confirmation_message' => $this->orderConfirmationMessage,
+                    'payment_confirmation_message' => $this->paymentConfirmationMessage,
+                    'configuration_completed_at' => now(),
+                ]
+            );
 
-                // Create or update EcommerceBot
-                if ($this->ecommerceBot) {
-                    $this->ecommerceBot->update($data);
-                } else {
-                    $this->ecommerceBot = EcommerceBot::create($data);
-                }
+            // Initial sync from Google Sheets
+            $sheetsService = new GoogleSheetsService();
+            $syncResult = $sheetsService->syncProductsFromSheets();
 
-                // Extract and save sheet IDs
-                if ($this->productSheetsUrl) {
-                    $productSheetsId = $this->extractSheetsId($this->productSheetsUrl);
-                    $this->ecommerceBot->update(['sheets_product_id' => $productSheetsId]);
-                }
-
-                if ($this->orderSheetsUrl) {
-                    $orderSheetsId = $this->extractSheetsId($this->orderSheetsUrl);
-                    $this->ecommerceBot->update(['sheets_order_id' => $orderSheetsId]);
-                }
-            });
-
-            $this->currentStep = 'complete';
-            $this->notify(['type' => 'success', 'message' => 'E-commerce bot configured successfully!']);
-
-        } catch (\Exception $e) {
-            \Log::error('EcommerceSetup saveConfiguration error: ' . $e->getMessage());
-            $this->notify(['type' => 'danger', 'message' => 'Configuration failed: ' . $e->getMessage()]);
-        }
-    }
-
-    private function extractSheetsId($url)
-    {
-        if (preg_match('/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/', $url, $matches)) {
-            return $matches[1];
-        }
-        return null;
-    }
-
-    public function performInitialSync()
-    {
-        if (!$this->ecommerceBot || !$this->ecommerceBot->isReady()) {
-            $this->notify(['type' => 'danger', 'message' => 'E-commerce bot is not properly configured']);
-            return;
-        }
-
-        try {
-            $sheetsService = new GoogleSheetsEcommerceService($this->ecommerceBot);
-            $result = $sheetsService->syncProductsFromSheets();
-
-            if ($result['success']) {
-                $this->notify(['type' => 'success', 'message' => $result['message']]);
-                return redirect()->route('tenant.products.list');
+            if ($syncResult['success']) {
+                $this->notify([
+                    'type' => 'success', 
+                    'message' => 'E-commerce setup completed successfully! ' . $syncResult['message']
+                ]);
             } else {
-                $this->notify(['type' => 'danger', 'message' => $result['message']]);
+                $this->notify([
+                    'type' => 'warning', 
+                    'message' => 'Setup completed, but initial sync failed: ' . $syncResult['message']
+                ]);
             }
 
+            return redirect()->route('tenant.ecommerce.dashboard');
+
         } catch (\Exception $e) {
-            $this->notify(['type' => 'danger', 'message' => 'Sync failed: ' . $e->getMessage()]);
+            $this->notify(['type' => 'danger', 'message' => 'Setup failed: ' . $e->getMessage()]);
         }
-    }
-
-    public function createSampleSheets()
-    {
-        $sheetsService = new GoogleSheetsEcommerceService(new EcommerceBot());
-        
-        $productStructure = $sheetsService->getDefaultProductSheetStructure();
-        $orderStructure = $sheetsService->getDefaultOrderSheetStructure();
-
-        return [
-            'products' => $productStructure,
-            'orders' => $orderStructure
-        ];
-    }
-
-    public function updateSyncSettings($field, $value)
-    {
-        data_set($this->syncSettings, $field, $value);
-    }
-
-    public function toggleAdvancedSettings()
-    {
-        $this->showAdvancedSettings = !$this->showAdvancedSettings;
-    }
-
-    public function resetSetup()
-    {
-        $this->currentStep = 'setup';
-        $this->validationResults = [];
-        $this->productValidation = [];
-        $this->orderValidation = [];
-    }
-
-    public function goToStep($step)
-    {
-        $allowedSteps = ['setup', 'validate', 'configure', 'complete'];
-        
-        if (!in_array($step, $allowedSteps)) {
-            $this->notify(['type' => 'danger', 'message' => 'Invalid step: ' . $step]);
-            return;
-        }
-
-        $this->currentStep = $step;
-        $this->notify(['type' => 'info', 'message' => 'Moved to step: ' . ucfirst($step)]);
-    }
-
-    public function reconfigure()
-    {
-        $this->currentStep = 'setup';
-        $this->notify(['type' => 'info', 'message' => 'You can now reconfigure your e-commerce bot settings']);
-    }
-
-    private function getDefaultSyncSettings(): array
-    {
-        return [
-            'auto_sync_enabled' => true,
-            'sync_interval_minutes' => 30,
-            'product_columns' => [
-                'name' => 'Product Name',
-                'price' => 'Price',
-                'description' => 'Description',
-                'image_url' => 'Image URL',
-                'stock_quantity' => 'Stock',
-                'category' => 'Category',
-                'sku' => 'SKU',
-                'status' => 'Status'
-            ],
-            'order_columns' => [
-                'customer_name' => 'Customer Name',
-                'customer_phone' => 'Phone',
-                'product_name' => 'Product',
-                'quantity' => 'Quantity',
-                'total_amount' => 'Total',
-                'status' => 'Status',
-                'order_date' => 'Order Date',
-                'delivery_address' => 'Address'
-            ]
-        ];
     }
 
     public function render()
     {
-        return view('livewire.tenant.ecommerce.ecommerce-setup', [
-            'sampleSheets' => $this->createSampleSheets()
+        $sheetsService = new GoogleSheetsService();
+        $sheetsStructure = $sheetsService->createDefaultSheets();
+
+        return view('livewire.tenant.ecommerce.setup', [
+            'sheetsStructure' => $sheetsStructure,
+            'availablePaymentMethods' => [
+                'cash_on_delivery' => 'Cash on Delivery',
+                'bank_transfer' => 'Bank Transfer',
+                'upi' => 'UPI Payment',
+                'credit_card' => 'Credit Card',
+                'debit_card' => 'Debit Card',
+                'paypal' => 'PayPal',
+                'stripe' => 'Stripe',
+                'razorpay' => 'Razorpay',
+            ],
+            'availableCurrencies' => [
+                'USD' => 'US Dollar ($)',
+                'EUR' => 'Euro (€)',
+                'GBP' => 'British Pound (£)',
+                'INR' => 'Indian Rupee (₹)',
+                'JPY' => 'Japanese Yen (¥)',
+                'AUD' => 'Australian Dollar (A$)',
+                'CAD' => 'Canadian Dollar (C$)',
+            ],
         ]);
     }
 }

@@ -230,7 +230,7 @@
                     verifyPayment(response);
                 },
                 prefill: {
-                    name: "{{ auth()->user()->name ?? auth()->user()->email ?? 'User' }}",
+                    name: "{{ auth()->user()->firstname }} {{ auth()->user()->lastname }}",
                     email: "{{ auth()->user()->email }}",
                     contact: "{{ auth()->user()->phone ?? '' }}"
                 },

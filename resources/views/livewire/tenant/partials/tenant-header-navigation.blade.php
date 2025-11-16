@@ -143,7 +143,7 @@
                         <button type="button"
                             class="max-w-xs flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-info-500 dark:focus:ring-offset-slate-800"
                             aria-expanded="false" aria-haspopup="true"
-                            data-tippy-content="{{ Auth::user()->name ?? Auth::user()->email ?? 'User' }}">
+                            data-tippy-content="{{ Auth()->user()->firstname .' ' . Auth()->user()->lastname }}">
                             <span class="sr-only">{{ 'open_user_menu' }}</span>
                             <img src="{{ Auth::user()?->avatar && Storage::disk('public')->exists(Auth::user()->avatar)
                                 ? asset('storage/' . Auth::user()->avatar)

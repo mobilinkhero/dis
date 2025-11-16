@@ -3,82 +3,106 @@
 namespace App\Models\Tenant;
 
 use App\Models\BaseModel;
-use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use App\Traits\TracksFeatureUsage;
-use Carbon\Carbon;
 
 /**
- * Product Model for E-commerce Bot
- * 
- * @property int $id
- * @property int|null $tenant_id
- * @property string $name
- * @property string|null $description
- * @property string|null $sku
- * @property decimal $price
- * @property decimal|null $compare_price
- * @property int $stock_quantity
- * @property string|null $image_url
- * @property string|null $category
- * @property string $status
- * @property array|null $variants
- * @property array|null $metadata
- * @property int $sheets_row_index
- * @property Carbon|null $last_synced_at
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
+ * Product Model for E-commerce
+ * Synced with Google Sheets
  */
 class Product extends BaseModel
 {
-    use BelongsToTenant, TracksFeatureUsage;
-
-    protected $table = 'products';
-
-    protected $casts = [
-        'tenant_id' => 'int',
-        'price' => 'decimal:2',
-        'compare_price' => 'decimal:2',
-        'stock_quantity' => 'int',
-        'variants' => 'array',
-        'metadata' => 'array',
-        'sheets_row_index' => 'int',
-        'last_synced_at' => 'datetime',
-    ];
+    use BelongsToTenant;
 
     protected $fillable = [
         'tenant_id',
+        'google_sheet_row_id',
+        'sku',
         'name',
         'description',
-        'sku',
         'price',
-        'compare_price',
+        'sale_price',
+        'cost_price',
         'stock_quantity',
-        'image_url',
+        'low_stock_threshold',
         'category',
+        'subcategory',
+        'tags',
+        'images',
+        'weight',
+        'dimensions',
         'status',
-        'variants',
-        'metadata',
-        'sheets_row_index',
+        'featured',
+        'meta_data',
+        'sync_status',
         'last_synced_at',
     ];
 
-    const STATUS_ACTIVE = 'active';
-    const STATUS_DRAFT = 'draft';
-    const STATUS_ARCHIVED = 'archived';
-    const STATUS_OUT_OF_STOCK = 'out_of_stock';
+    protected $casts = [
+        'tenant_id' => 'int',
+        'google_sheet_row_id' => 'int',
+        'price' => 'decimal:2',
+        'sale_price' => 'decimal:2',
+        'cost_price' => 'decimal:2',
+        'stock_quantity' => 'int',
+        'low_stock_threshold' => 'int',
+        'weight' => 'decimal:2',
+        'featured' => 'bool',
+        'tags' => 'json',
+        'images' => 'json',
+        'dimensions' => 'json',
+        'meta_data' => 'json',
+        'last_synced_at' => 'datetime',
+    ];
 
     /**
-     * Get available statuses
+     * Get effective price (sale price if available, otherwise regular price)
      */
-    public static function getStatuses(): array
+    public function getEffectivePriceAttribute(): float
     {
-        return [
-            self::STATUS_ACTIVE => 'Active',
-            self::STATUS_DRAFT => 'Draft',
-            self::STATUS_ARCHIVED => 'Archived',
-            self::STATUS_OUT_OF_STOCK => 'Out of Stock'
-        ];
+        return $this->sale_price && $this->sale_price < $this->price 
+            ? (float) $this->sale_price 
+            : (float) $this->price;
+    }
+
+    /**
+     * Check if product is on sale
+     */
+    public function getIsOnSaleAttribute(): bool
+    {
+        return $this->sale_price && $this->sale_price < $this->price;
+    }
+
+    /**
+     * Check if product is low in stock
+     */
+    public function getIsLowStockAttribute(): bool
+    {
+        return $this->stock_quantity <= ($this->low_stock_threshold ?? 5);
+    }
+
+    /**
+     * Check if product is in stock
+     */
+    public function getIsInStockAttribute(): bool
+    {
+        return $this->stock_quantity > 0;
+    }
+
+    /**
+     * Get formatted price
+     */
+    public function getFormattedPriceAttribute(): string
+    {
+        return '$' . number_format($this->effective_price, 2);
+    }
+
+    /**
+     * Get primary image
+     */
+    public function getPrimaryImageAttribute(): ?string
+    {
+        $images = $this->images ?? [];
+        return is_array($images) && count($images) > 0 ? $images[0] : null;
     }
 
     /**
@@ -86,7 +110,7 @@ class Product extends BaseModel
      */
     public function scopeActive($query)
     {
-        return $query->where('status', self::STATUS_ACTIVE);
+        return $query->where('status', 'active');
     }
 
     /**
@@ -98,136 +122,53 @@ class Product extends BaseModel
     }
 
     /**
-     * Scope for available products (active and in stock)
+     * Scope for featured products
      */
-    public function scopeAvailable($query)
+    public function scopeFeatured($query)
     {
-        return $query->active()->inStock();
+        return $query->where('featured', true);
     }
 
     /**
-     * Check if product is available for sale
+     * Scope for products by category
      */
-    public function isAvailable(): bool
+    public function scopeByCategory($query, $category)
     {
-        return $this->status === self::STATUS_ACTIVE && $this->stock_quantity > 0;
+        return $query->where('category', $category);
     }
 
     /**
-     * Check if product is low in stock
+     * Reduce stock quantity
      */
-    public function isLowStock($threshold = 5): bool
+    public function reduceStock(int $quantity): bool
     {
-        return $this->stock_quantity <= $threshold && $this->stock_quantity > 0;
-    }
-
-    /**
-     * Get formatted price
-     */
-    public function getFormattedPriceAttribute(): string
-    {
-        return number_format($this->price, 2);
-    }
-
-    /**
-     * Get discount percentage if compare price exists
-     */
-    public function getDiscountPercentageAttribute(): ?int
-    {
-        if ($this->compare_price && $this->compare_price > $this->price) {
-            return round((($this->compare_price - $this->price) / $this->compare_price) * 100);
+        if ($this->stock_quantity >= $quantity) {
+            $this->decrement('stock_quantity', $quantity);
+            return true;
         }
-        return null;
+        return false;
     }
 
     /**
-     * Relationship with tenant
+     * Restore stock quantity
      */
-    public function tenant()
+    public function restoreStock(int $quantity): bool
     {
-        return $this->belongsTo(Tenant::class);
+        $this->increment('stock_quantity', $quantity);
+        return true;
     }
 
     /**
-     * Relationship with order items
+     * Get related products (same category)
      */
-    public function orderItems()
+    public function getRelatedProducts($limit = 4)
     {
-        return $this->hasMany(OrderItem::class);
-    }
-
-    /**
-     * Get total sold quantity
-     */
-    public function getTotalSoldAttribute(): int
-    {
-        return $this->orderItems()->sum('quantity');
-    }
-
-    /**
-     * Update stock quantity
-     */
-    public function updateStock(int $quantity, bool $increase = false): bool
-    {
-        if ($increase) {
-            $this->stock_quantity += $quantity;
-        } else {
-            $this->stock_quantity = max(0, $this->stock_quantity - $quantity);
-        }
-        
-        // Update status if out of stock
-        if ($this->stock_quantity === 0 && $this->status === self::STATUS_ACTIVE) {
-            $this->status = self::STATUS_OUT_OF_STOCK;
-        } elseif ($this->stock_quantity > 0 && $this->status === self::STATUS_OUT_OF_STOCK) {
-            $this->status = self::STATUS_ACTIVE;
-        }
-        
-        return $this->save();
-    }
-
-    /**
-     * Get feature slug for feature usage tracking
-     */
-    public function getFeatureSlug(): ?string
-    {
-        return 'products';
-    }
-
-    /**
-     * Get WhatsApp message format for this product
-     */
-    public function toWhatsAppMessage(): array
-    {
-        $message = "*{$this->name}*\n\n";
-        
-        if ($this->description) {
-            $message .= "{$this->description}\n\n";
-        }
-        
-        $message .= "💰 Price: ₹{$this->formatted_price}";
-        
-        if ($this->compare_price && $this->discount_percentage) {
-            $message .= " ~~₹{$this->compare_price}~~ ({$this->discount_percentage}% OFF)";
-        }
-        
-        $message .= "\n📦 Stock: {$this->stock_quantity} units";
-        
-        if ($this->category) {
-            $message .= "\n🏷️ Category: {$this->category}";
-        }
-
-        $buttons = [
-            ['id' => "add_to_cart_{$this->id}", 'title' => '🛒 Add to Cart'],
-            ['id' => "product_details_{$this->id}", 'title' => 'ℹ️ More Info'],
-        ];
-
-        return [
-            'type' => 'interactive',
-            'interactive' => [
-                'type' => 'button',
-                'body' => ['text' => $message],
-                'action' => ['buttons' => $buttons]
-            ]
-        ];
+        return static::where('tenant_id', $this->tenant_id)
+            ->where('category', $this->category)
+            ->where('id', '!=', $this->id)
+            ->where('status', 'active')
+            ->inStock()
+            ->limit($limit)
+            ->get();
     }
 }

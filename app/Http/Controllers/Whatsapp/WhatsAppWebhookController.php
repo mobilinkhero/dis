@@ -14,6 +14,7 @@ use App\Models\Tenant\TemplateBot;
 use App\Models\Tenant\WhatsappTemplate;
 use App\Services\FeatureService;
 use App\Services\pusher\PusherService;
+use App\Services\EcommerceOrderService;
 use App\Traits\WhatsApp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -238,6 +239,36 @@ class WhatsAppWebhookController extends Controller
                     }
 
                     if (! $this->is_bot_stop) {
+                        // First, try to handle e-commerce interactions
+                        $ecommerceService = new EcommerceOrderService($this->tenant_id);
+                        $ecommerceResult = $ecommerceService->processMessage($trigger_msg, $contact_data);
+                        
+                        if ($ecommerceResult['handled'] && $ecommerceResult['response']) {
+                            // Send e-commerce response
+                            $ecommerceMessage = [
+                                'type' => 'text',
+                                'message' => $ecommerceResult['response'],
+                                'rel_id' => $contact_data->id,
+                            ];
+                            
+                            $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $ecommerceMessage, $metadata['phone_number_id']);
+                            
+                            $chatId = $this->createOrUpdateInteraction(
+                                $contact_number, 
+                                $message_data['metadata']['display_phone_number'], 
+                                $message_data['metadata']['phone_number_id'], 
+                                $contact_data->firstname.' '.$contact_data->lastname, 
+                                '', 
+                                '', 
+                                false
+                            );
+                            
+                            $this->storeBotMessages($ecommerceMessage, $chatId, $contact_data, 'ecommerce_bot', $response);
+                            
+                            // Exit early if e-commerce handled the message
+                            return;
+                        }
+                        
                         // Fetch template and message bots based on interaction
                         $template_bots = TemplateBot::getTemplateBotsByRelType($contact_data->type ?? '', $query_trigger_msg, $this->tenant_id, $reply_type);
                         $message_bots = MessageBot::getMessageBotsbyRelType($contact_data->type ?? '', $query_trigger_msg, $this->tenant_id, $reply_type);

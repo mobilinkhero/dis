@@ -113,14 +113,6 @@ Route::middleware(['auth', TenantMiddleware::class, CheckTenantDeleted::class, E
             Route::get('/activity-log', ActivityLogList::class)->name('activity-log.list');
             Route::get('/activity-log/{logId?}', ActivityLogDetails::class)->name('activity-log.details');
 
-            // E-commerce Routes
-            Route::get('/ecommerce', \App\Livewire\Tenant\Ecommerce\EcommerceDashboard::class)->name('ecommerce.dashboard');
-            Route::get('/ecommerce/setup', \App\Livewire\Tenant\Ecommerce\EcommerceSetup::class)->name('ecommerce.setup');
-            Route::get('/products', \App\Livewire\Tenant\Ecommerce\ProductManagement::class)->name('products.list');
-            Route::get('/orders', \App\Livewire\Tenant\Ecommerce\OrderManagement::class)->name('orders.list');
-            Route::get('/ecommerce/upselling', \App\Livewire\Tenant\Ecommerce\UpsellCampaigns::class)->name('ecommerce.upselling');
-            Route::get('/ecommerce/analytics', \App\Livewire\Tenant\Ecommerce\SalesAnalytics::class)->name('ecommerce.analytics');
-
             // Chat
             Route::get('ai-prompt', ManageAiPrompt::class)->name('ai-prompt');
             Route::get('canned-reply', ManageCannedReply::class)->name('canned-reply');
@@ -280,7 +272,17 @@ Route::middleware(['auth', TenantMiddleware::class, CheckTenantDeleted::class, E
             Route::post('/dynamic-template/upload-media', [WhatsappDynamicTemplateController::class, 'uploadMedia'])->name('tenant.dynamic-template.upload-media');
 
             Route::get('/custom-fields', CustomFieldList::class)->name('custom-fields.list');
-            Route::get('/custom-fields/create', CustomFieldCreator::class)->name('custom-fields.create');
+            Route::get('/custom-fields/field/{fieldId?}', CustomFieldCreator::class)->name('custom-fields.save');
+
+            // E-commerce Routes
+            Route::prefix('abc/ecommerce')->name('ecommerce.')->group(function () {
+                Route::get('/', \App\Livewire\Tenant\Ecommerce\EcommerceDashboard::class)->name('dashboard');
+                Route::get('/setup', \App\Livewire\Tenant\Ecommerce\EcommerceSetup::class)->name('setup');
+                Route::get('/products', \App\Livewire\Tenant\Ecommerce\ProductManager::class)->name('products');
+                Route::get('/orders', \App\Livewire\Tenant\Ecommerce\OrderManager::class)->name('orders');
+                Route::get('/analytics', \App\Livewire\Tenant\Ecommerce\EcommerceAnalytics::class)->name('analytics');
+                Route::get('/settings', \App\Livewire\Tenant\Ecommerce\EcommerceSettings::class)->name('settings');
+            });
             Route::get('/custom-fields/{customFieldId}/edit', CustomFieldCreator::class)->name('custom-fields.edit');
 
             Route::post('/coupons/validate', [CouponController::class, 'validate'])->name('coupon.validate');
