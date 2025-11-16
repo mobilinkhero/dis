@@ -63,7 +63,7 @@ class EcommerceDashboard extends Component
 
     public function redirectToSetup()
     {
-        return redirect()->route('tenant.ecommerce.setup');
+        return redirect()->to(tenant_route('tenant.ecommerce.setup'));
     }
 
     public function syncNow()

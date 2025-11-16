@@ -54,7 +54,7 @@ class EcommerceSetup extends Component
         // Check if already configured
         $config = EcommerceConfiguration::where('tenant_id', tenant_id())->first();
         if ($config && $config->isFullyConfigured()) {
-            return redirect()->route('tenant.ecommerce.dashboard');
+            return redirect()->to(tenant_route('tenant.ecommerce.dashboard'));
         }
 
         // Load existing configuration if any
@@ -230,7 +230,7 @@ class EcommerceSetup extends Component
                 ]);
             }
 
-            return redirect()->route('tenant.ecommerce.dashboard');
+            return redirect()->to(tenant_route('tenant.ecommerce.dashboard'));
 
         } catch (\Exception $e) {
             $this->notify(['type' => 'danger', 'message' => 'Setup failed: ' . $e->getMessage()]);
