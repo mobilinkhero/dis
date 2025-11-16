@@ -4,6 +4,7 @@ namespace App\Livewire\Tenant\Ecommerce;
 
 use App\Models\Tenant\EcommerceConfiguration;
 use App\Services\GoogleSheetsService;
+use App\Services\GoogleSheetsServiceAccountService;
 use Livewire\Component;
 
 class EcommerceSetup extends Component
@@ -123,18 +124,40 @@ class EcommerceSetup extends Component
             'googleSheetsUrl' => 'required|url'
         ]);
 
-        // Validate Google Sheets URL
-        $sheetsService = new GoogleSheetsService();
-        $validation = $sheetsService->validateSheetsUrl($this->googleSheetsUrl);
+        // Check if service account is available
+        $serviceAccountService = new GoogleSheetsServiceAccountService();
+        $serviceAccountStatus = $serviceAccountService->checkServiceAccountSetup();
 
-        if (!$validation['valid']) {
-            $this->addError('googleSheetsUrl', $validation['message']);
-            return;
+        if ($serviceAccountStatus['configured']) {
+            // Use service account validation
+            $this->notify(['type' => 'info', 'message' => 'Debug: Using Service Account validation']);
+            
+            // Extract sheet ID from URL
+            if (preg_match('/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/', $this->googleSheetsUrl, $matches)) {
+                $this->extractedSheetId = $matches[1];
+                $this->sheetsValid = true;
+                $this->sheetValidationMessage = 'Sheet validated successfully using Service Account. Make sure the sheet is shared with: ' . $serviceAccountStatus['service_account_email'];
+                $this->notify(['type' => 'success', 'message' => 'Service Account detected! Please share your sheet with: ' . $serviceAccountStatus['service_account_email']]);
+            } else {
+                $this->addError('googleSheetsUrl', 'Invalid Google Sheets URL format');
+                return;
+            }
+        } else {
+            // Fallback to public access validation
+            $this->notify(['type' => 'warning', 'message' => 'Debug: Service Account not configured, using public access validation']);
+            
+            $sheetsService = new GoogleSheetsService();
+            $validation = $sheetsService->validateSheetsUrl($this->googleSheetsUrl);
+
+            if (!$validation['valid']) {
+                $this->addError('googleSheetsUrl', $validation['message']);
+                return;
+            }
+
+            $this->extractedSheetId = $validation['sheet_id'];
+            $this->sheetsValid = true;
+            $this->sheetValidationMessage = $validation['message'];
         }
-
-        $this->extractedSheetId = $validation['sheet_id'];
-        $this->sheetsValid = true;
-        $this->sheetValidationMessage = $validation['message'];
     }
 
     public function validateStep2()
@@ -153,21 +176,45 @@ class EcommerceSetup extends Component
 
             $this->notify(['type' => 'info', 'message' => 'Debug: Re-validating Google Sheets URL: ' . $this->googleSheetsUrl]);
 
-            // Re-validate the Google Sheets URL
-            $sheetsService = new GoogleSheetsService();
-            $validation = $sheetsService->validateSheetsUrl($this->googleSheetsUrl);
+            // Check if service account is available
+            $serviceAccountService = new GoogleSheetsServiceAccountService();
+            $serviceAccountStatus = $serviceAccountService->checkServiceAccountSetup();
 
-            if (!$validation['valid']) {
-                $this->notify(['type' => 'danger', 'message' => 'Debug: Validation failed - ' . $validation['message']]);
-                $this->addError('googleSheetsUrl', $validation['message']);
-                $this->currentStep = 1;
-                return;
+            if ($serviceAccountStatus['configured']) {
+                // Use service account validation
+                $this->notify(['type' => 'info', 'message' => 'Debug: Using Service Account validation']);
+                
+                // Extract sheet ID from URL
+                if (preg_match('/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/', $this->googleSheetsUrl, $matches)) {
+                    $this->extractedSheetId = $matches[1];
+                    $this->sheetsValid = true;
+                    $this->sheetValidationMessage = 'Sheet validated successfully using Service Account. Make sure the sheet is shared with: ' . $serviceAccountStatus['service_account_email'];
+                    $this->notify(['type' => 'success', 'message' => 'Debug: Service Account validation successful, sheet ID: ' . $this->extractedSheetId]);
+                } else {
+                    $this->notify(['type' => 'danger', 'message' => 'Debug: Invalid Google Sheets URL format']);
+                    $this->addError('googleSheetsUrl', 'Invalid Google Sheets URL format');
+                    $this->currentStep = 1;
+                    return;
+                }
+            } else {
+                // Fallback to public access validation
+                $this->notify(['type' => 'warning', 'message' => 'Debug: Service Account not configured, using public access validation']);
+                
+                $sheetsService = new GoogleSheetsService();
+                $validation = $sheetsService->validateSheetsUrl($this->googleSheetsUrl);
+
+                if (!$validation['valid']) {
+                    $this->notify(['type' => 'danger', 'message' => 'Debug: Validation failed - ' . $validation['message']]);
+                    $this->addError('googleSheetsUrl', $validation['message']);
+                    $this->currentStep = 1;
+                    return;
+                }
+
+                $this->extractedSheetId = $validation['sheet_id'];
+                $this->sheetsValid = true;
+                $this->sheetValidationMessage = $validation['message'];
+                $this->notify(['type' => 'success', 'message' => 'Debug: Validation successful, sheet ID: ' . $this->extractedSheetId]);
             }
-
-            $this->extractedSheetId = $validation['sheet_id'];
-            $this->sheetsValid = true;
-            $this->sheetValidationMessage = $validation['message'];
-            $this->notify(['type' => 'success', 'message' => 'Debug: Validation successful, sheet ID: ' . $this->extractedSheetId]);
         }
         
         $this->notify(['type' => 'success', 'message' => 'Debug: Step 2 validation completed successfully']);
