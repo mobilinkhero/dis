@@ -136,8 +136,8 @@ class EcommerceSetup extends Component
             if (preg_match('/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/', $this->googleSheetsUrl, $matches)) {
                 $this->extractedSheetId = $matches[1];
                 $this->sheetsValid = true;
-                $this->sheetValidationMessage = 'Sheet validated successfully using Service Account. Make sure the sheet is shared with: ' . $serviceAccountStatus['service_account_email'];
-                $this->notify(['type' => 'success', 'message' => 'Service Account detected! Please share your sheet with: ' . $serviceAccountStatus['service_account_email']]);
+                $this->sheetValidationMessage = 'Sheet validated successfully using Service Account. Make sure the sheet is shared with: ' . $serviceAccountStatus['email'];
+                $this->notify(['type' => 'success', 'message' => 'Service Account detected! Please share your sheet with: ' . $serviceAccountStatus['email']]);
             } else {
                 $this->addError('googleSheetsUrl', 'Invalid Google Sheets URL format');
                 return;
@@ -188,7 +188,7 @@ class EcommerceSetup extends Component
                 if (preg_match('/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/', $this->googleSheetsUrl, $matches)) {
                     $this->extractedSheetId = $matches[1];
                     $this->sheetsValid = true;
-                    $this->sheetValidationMessage = 'Sheet validated successfully using Service Account. Make sure the sheet is shared with: ' . $serviceAccountStatus['service_account_email'];
+                    $this->sheetValidationMessage = 'Sheet validated successfully using Service Account. Make sure the sheet is shared with: ' . $serviceAccountStatus['email'];
                     $this->notify(['type' => 'success', 'message' => 'Debug: Service Account validation successful, sheet ID: ' . $this->extractedSheetId]);
                 } else {
                     $this->notify(['type' => 'danger', 'message' => 'Debug: Invalid Google Sheets URL format']);
