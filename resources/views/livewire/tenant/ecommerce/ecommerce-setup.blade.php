@@ -452,7 +452,7 @@
                     </div>
 
                     <a 
-                        href="{{ route('tenant.bot-flow_list') }}"
+                        href="{{ tenant_route('tenant.bot-flow_list') }}"
                         class="block w-full bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium text-center transition-colors"
                     >
                         🔧 Create Sales Flows
