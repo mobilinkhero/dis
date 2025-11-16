@@ -275,7 +275,7 @@ Route::middleware(['auth', TenantMiddleware::class, CheckTenantDeleted::class, E
             Route::get('/custom-fields/field/{fieldId?}', CustomFieldCreator::class)->name('custom-fields.save');
 
             // E-commerce Routes
-            Route::prefix('abc/ecommerce')->name('ecommerce.')->group(function () {
+            Route::prefix('abc/ecommerce')->name('tenant.ecommerce.')->group(function () {
                 Route::get('/', \App\Livewire\Tenant\Ecommerce\EcommerceDashboard::class)->name('dashboard');
                 Route::get('/setup', \App\Livewire\Tenant\Ecommerce\EcommerceSetup::class)->name('setup');
                 Route::get('/products', \App\Livewire\Tenant\Ecommerce\ProductManager::class)->name('products');

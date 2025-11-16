@@ -148,7 +148,6 @@ return [
             'permission' => ['tenant.ecommerce.view'],
             'order' => 8,
             'section_id' => 'ecommerce',
-            'feature_required' => 'ecommerce',
             'children' => [
                 'ecommerce_dashboard' => [
                     'type' => 'item',
@@ -158,7 +157,6 @@ return [
                     'permission' => 'tenant.ecommerce.view',
                     'order' => 1,
                     'active_routes' => ['tenant.ecommerce.dashboard', 'tenant.ecommerce.setup'],
-                    'feature_required' => 'ecommerce',
                 ],
                 'products' => [
                     'type' => 'item',
@@ -168,7 +166,6 @@ return [
                     'permission' => 'tenant.ecommerce.view',
                     'order' => 2,
                     'active_routes' => ['tenant.ecommerce.products'],
-                    'feature_required' => 'ecommerce',
                 ],
                 'orders' => [
                     'type' => 'item',
@@ -178,7 +175,6 @@ return [
                     'permission' => 'tenant.ecommerce.view',
                     'order' => 3,
                     'active_routes' => ['tenant.ecommerce.orders'],
-                    'feature_required' => 'ecommerce',
                 ],
                 'analytics' => [
                     'type' => 'item',
@@ -188,7 +184,15 @@ return [
                     'permission' => 'tenant.ecommerce.view',
                     'order' => 4,
                     'active_routes' => ['tenant.ecommerce.analytics'],
-                    'feature_required' => 'ecommerce',
+                ],
+                'settings' => [
+                    'type' => 'item',
+                    'label' => 'settings',
+                    'route' => 'tenant.ecommerce.settings',
+                    'icon' => 'heroicon-o-cog-6-tooth',
+                    'permission' => 'tenant.ecommerce.view',
+                    'order' => 5,
+                    'active_routes' => ['tenant.ecommerce.settings'],
                 ],
             ],
         ],
