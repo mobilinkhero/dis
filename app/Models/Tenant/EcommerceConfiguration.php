@@ -18,6 +18,7 @@ class EcommerceConfiguration extends BaseModel
         'tenant_id',
         'is_configured',
         'google_sheets_url',
+        'google_sheets_enabled',
         'products_sheet_id',
         'orders_sheet_id',
         'customers_sheet_id',
@@ -38,6 +39,7 @@ class EcommerceConfiguration extends BaseModel
     protected $casts = [
         'tenant_id' => 'int',
         'is_configured' => 'bool',
+        'google_sheets_enabled' => 'bool',
         'payment_methods' => 'json',
         'shipping_settings' => 'json',
         'abandoned_cart_settings' => 'json',
