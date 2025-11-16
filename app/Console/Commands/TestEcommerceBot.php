@@ -15,7 +15,40 @@ class TestEcommerceBot extends Command
     public function handle()
     {
         $message = $this->argument('message');
-        $tenantId = $this->option('tenant') ?? tenant_id();
+        $tenantId = $this->option('tenant');
+        
+        // If no tenant specified, try to find one
+        if (!$tenantId) {
+            $tenantId = function_exists('tenant_id') ? tenant_id() : null;
+        }
+        
+        // Still no tenant? Find the first configured one
+        if (!$tenantId) {
+            $this->warn("No tenant ID specified. Looking for configured tenants...");
+            $config = EcommerceConfiguration::where('is_configured', true)
+                                           ->whereNotNull('google_sheets_url')
+                                           ->first();
+            
+            if ($config) {
+                $tenantId = $config->tenant_id;
+                $this->info("✅ Found configured tenant: {$tenantId}");
+            } else {
+                $this->error("❌ No configured e-commerce tenants found.");
+                $this->line("\nAvailable configurations:");
+                $allConfigs = EcommerceConfiguration::all();
+                if ($allConfigs->isEmpty()) {
+                    $this->error("   No e-commerce configurations exist.");
+                    $this->line("\nPlease complete e-commerce setup first.");
+                } else {
+                    foreach ($allConfigs as $cfg) {
+                        $this->line("   - Tenant {$cfg->tenant_id}: " . 
+                                   ($cfg->is_configured ? "Configured" : "Not configured"));
+                    }
+                    $this->line("\nRun: php artisan ecommerce:test-bot shop --tenant=<ID>");
+                }
+                return 1;
+            }
+        }
 
         $this->info("Testing E-commerce Bot");
         $this->info("Tenant ID: {$tenantId}");
