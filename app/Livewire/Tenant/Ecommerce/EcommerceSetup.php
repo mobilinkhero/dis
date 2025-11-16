@@ -139,19 +139,26 @@ class EcommerceSetup extends Component
 
     public function validateStep2()
     {
+        // Debug logging
+        $this->notify(['type' => 'info', 'message' => 'Step 2 validation started. sheetsValid: ' . ($this->sheetsValid ? 'true' : 'false') . ', extractedSheetId: ' . $this->extractedSheetId]);
+        
         // If sheets are not already validated, validate them now
         if (!$this->sheetsValid || empty($this->extractedSheetId)) {
             if (empty($this->googleSheetsUrl)) {
+                $this->notify(['type' => 'danger', 'message' => 'Debug: Google Sheets URL is empty']);
                 $this->addError('googleSheetsUrl', 'Please enter your Google Sheets URL first');
                 $this->currentStep = 1;
                 return;
             }
+
+            $this->notify(['type' => 'info', 'message' => 'Debug: Re-validating Google Sheets URL: ' . $this->googleSheetsUrl]);
 
             // Re-validate the Google Sheets URL
             $sheetsService = new GoogleSheetsService();
             $validation = $sheetsService->validateSheetsUrl($this->googleSheetsUrl);
 
             if (!$validation['valid']) {
+                $this->notify(['type' => 'danger', 'message' => 'Debug: Validation failed - ' . $validation['message']]);
                 $this->addError('googleSheetsUrl', $validation['message']);
                 $this->currentStep = 1;
                 return;
@@ -160,7 +167,10 @@ class EcommerceSetup extends Component
             $this->extractedSheetId = $validation['sheet_id'];
             $this->sheetsValid = true;
             $this->sheetValidationMessage = $validation['message'];
+            $this->notify(['type' => 'success', 'message' => 'Debug: Validation successful, sheet ID: ' . $this->extractedSheetId]);
         }
+        
+        $this->notify(['type' => 'success', 'message' => 'Debug: Step 2 validation completed successfully']);
     }
 
     public function validateStep3()
