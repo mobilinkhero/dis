@@ -16,6 +16,11 @@ use App\Http\Middleware\SanitizeInputs;
 use Corbital\Installer\Http\Controllers\InstallController;
 use Illuminate\Support\Facades\Route;
 
+// Include debug routes (REMOVE AFTER DEBUGGING)
+if (file_exists(__DIR__ . '/debug.php') && config('app.debug')) {
+    include __DIR__ . '/debug.php';
+}
+
 Route::get('/', [HomeController::class, 'landingPage'])->name('home');
 
 // Debug log viewer route
