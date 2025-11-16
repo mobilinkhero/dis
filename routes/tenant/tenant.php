@@ -114,6 +114,7 @@ Route::middleware(['auth', TenantMiddleware::class, CheckTenantDeleted::class, E
             Route::get('/activity-log/{logId?}', ActivityLogDetails::class)->name('activity-log.details');
 
             // E-commerce Routes
+            Route::get('/ecommerce', \App\Livewire\Tenant\Ecommerce\EcommerceDashboard::class)->name('ecommerce.dashboard');
             Route::get('/ecommerce/setup', \App\Livewire\Tenant\Ecommerce\EcommerceSetup::class)->name('ecommerce.setup');
             Route::get('/products', \App\Livewire\Tenant\Ecommerce\ProductManagement::class)->name('products.list');
             Route::get('/orders', \App\Livewire\Tenant\Ecommerce\OrderManagement::class)->name('orders.list');
