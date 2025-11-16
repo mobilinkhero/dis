@@ -74,17 +74,16 @@ class TestEcommerceBot extends Command
             return 1;
         }
 
-        // Create a test contact
-        $testContact = Contact::firstOrCreate(
-            ['phone' => '1234567890', 'tenant_id' => $tenantId],
-            [
-                'firstname' => 'Test',
-                'lastname' => 'Customer',
-                'type' => 'lead'
-            ]
-        );
+        // Create a mock contact for testing
+        $testContact = new Contact();
+        $testContact->phone = '1234567890';
+        $testContact->tenant_id = $tenantId;
+        $testContact->firstname = 'Test';
+        $testContact->lastname = 'Customer';
+        $testContact->type = 'lead';
+        $testContact->id = 999999; // Mock ID
 
-        $this->info("✅ Test contact created/found: {$testContact->firstname} {$testContact->lastname}");
+        $this->info("✅ Using test contact: {$testContact->firstname} {$testContact->lastname}");
         $this->line('');
 
         // Test the bot
