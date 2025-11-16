@@ -491,7 +491,7 @@
                                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                                         Sample Data (paste in row 2):
                                                     </label>
-                                                    <button onclick="navigator.clipboard.writeText('{{ implode(\"\t\", $sheetData['sample_data'][0]) }}')" 
+                                                    <button onclick="navigator.clipboard.writeText('{{ implode(chr(9), $sheetData['sample_data'][0]) }}')" 
                                                             class="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700">
                                                         📋 Copy Sample
                                                     </button>
