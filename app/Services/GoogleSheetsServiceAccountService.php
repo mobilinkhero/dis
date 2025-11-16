@@ -133,7 +133,7 @@ class GoogleSheetsServiceAccountService
     /**
      * Get OAuth2 access token using Service Account
      */
-    protected function getAccessToken(): array
+    public function getAccessToken(): array
     {
         try {
             // Check cache first
@@ -142,7 +142,10 @@ class GoogleSheetsServiceAccountService
             
             if ($cachedToken) {
                 $this->accessToken = $cachedToken;
-                return ['success' => true];
+                return [
+                    'success' => true,
+                    'token' => $cachedToken
+                ];
             }
 
             // Load service account credentials
@@ -171,7 +174,10 @@ class GoogleSheetsServiceAccountService
                 // Cache token for 50 minutes (expires in 60)
                 Cache::put($cacheKey, $this->accessToken, 50 * 60);
                 
-                return ['success' => true];
+                return [
+                    'success' => true,
+                    'token' => $this->accessToken
+                ];
             } else {
                 return [
                     'success' => false,

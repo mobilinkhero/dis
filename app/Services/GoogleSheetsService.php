@@ -6,6 +6,7 @@ use App\Models\Tenant\EcommerceConfiguration;
 use App\Models\Tenant\Product;
 use App\Models\Tenant\Order;
 use App\Services\EcommerceLogger;
+use App\Services\GoogleSheetsServiceAccountService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -251,6 +252,19 @@ class GoogleSheetsService
                 'url' => $this->config->google_sheets_url
             ]);
 
+            // Check if service account is available
+            $serviceAccountService = new GoogleSheetsServiceAccountService();
+            $serviceAccountStatus = $serviceAccountService->checkServiceAccountSetup();
+            
+            if ($serviceAccountStatus['configured']) {
+                // Use service account to fetch data
+                EcommerceLogger::info('Using Service Account for sync');
+                return $this->syncProductsWithServiceAccount($sheetId, $serviceAccountService);
+            }
+
+            // Fallback to public access
+            EcommerceLogger::info('Attempting public access for sync');
+            
             // First try to get the Products sheet (gid may vary)
             // We'll try gid=0 first (usually the first sheet)
             $csvUrl = "https://docs.google.com/spreadsheets/d/{$sheetId}/export?format=csv&gid=0";
@@ -364,6 +378,125 @@ class GoogleSheetsService
             return [
                 'success' => false,
                 'message' => 'Error syncing products: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Sync products using Service Account authentication
+     */
+    protected function syncProductsWithServiceAccount(string $sheetId, GoogleSheetsServiceAccountService $serviceAccount): array
+    {
+        try {
+            // Get access token
+            $tokenResult = $serviceAccount->getAccessToken();
+            if (!$tokenResult['success']) {
+                EcommerceLogger::error('Failed to get service account access token', [
+                    'error' => $tokenResult['message']
+                ]);
+                return [
+                    'success' => false,
+                    'message' => 'Authentication failed: ' . $tokenResult['message']
+                ];
+            }
+
+            $accessToken = $tokenResult['token'];
+            
+            // Use Sheets API to get data
+            $apiUrl = "https://sheets.googleapis.com/v4/spreadsheets/{$sheetId}/values/Products!A:Z";
+            
+            EcommerceLogger::info('Fetching data using Sheets API', [
+                'api_url' => $apiUrl
+            ]);
+
+            $response = Http::withToken($accessToken)
+                ->timeout(30)
+                ->get($apiUrl);
+
+            if (!$response->successful()) {
+                $errorMessage = 'Failed to fetch products using Service Account. Status: ' . $response->status();
+                
+                EcommerceLogger::error('Service Account fetch failed', [
+                    'status' => $response->status(),
+                    'body' => substr($response->body(), 0, 500)
+                ]);
+
+                if ($response->status() === 404) {
+                    $errorMessage = 'Products sheet not found. Please create a sheet named "Products" in your Google Sheets.';
+                }
+
+                return [
+                    'success' => false,
+                    'message' => $errorMessage
+                ];
+            }
+
+            $data = $response->json();
+            
+            if (!isset($data['values']) || empty($data['values'])) {
+                return [
+                    'success' => false,
+                    'message' => 'No data found in the Products sheet. Please add products to the sheet first.'
+                ];
+            }
+
+            $rows = $data['values'];
+            $header = array_shift($rows);
+            
+            EcommerceLogger::info('Processing sheet data with Service Account', [
+                'headers' => $header,
+                'row_count' => count($rows)
+            ]);
+            
+            $syncedCount = 0;
+            $errorCount = 0;
+
+            foreach ($rows as $rowIndex => $row) {
+                if (empty($row) || empty($row[0])) continue; // Skip empty rows
+                
+                try {
+                    // Pad row to match header length
+                    $row = array_pad($row, count($header), '');
+                    $productData = array_combine($header, $row);
+                    $this->syncProduct($productData);
+                    $syncedCount++;
+                } catch (\Exception $e) {
+                    EcommerceLogger::error('Product sync error', [
+                        'row_index' => $rowIndex,
+                        'error' => $e->getMessage()
+                    ]);
+                    $errorCount++;
+                }
+            }
+
+            // Update sync status
+            $this->config->update([
+                'sync_status' => 'completed',
+                'last_sync_at' => Carbon::now()
+            ]);
+
+            EcommerceLogger::info('Product sync completed with Service Account', [
+                'tenant_id' => $this->tenantId,
+                'synced_count' => $syncedCount,
+                'error_count' => $errorCount
+            ]);
+
+            return [
+                'success' => true,
+                'message' => "Synced {$syncedCount} products successfully using Service Account. {$errorCount} errors.",
+                'synced' => $syncedCount,
+                'errors' => $errorCount
+            ];
+
+        } catch (\Exception $e) {
+            EcommerceLogger::error('Service Account sync failed with exception', [
+                'tenant_id' => $this->tenantId,
+                'exception' => $e->getMessage()
+            ]);
+            
+            return [
+                'success' => false,
+                'message' => 'Error syncing with Service Account: ' . $e->getMessage()
             ];
         }
     }
