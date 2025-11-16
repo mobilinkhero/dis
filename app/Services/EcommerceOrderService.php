@@ -44,10 +44,9 @@ class EcommerceOrderService
             );
 
             // Check if e-commerce is configured
-            if (!$this->config || !$this->config->isFullyConfigured()) {
-                EcommerceLogger::warning('E-commerce not configured for tenant', [
-                    'tenant_id' => $this->tenantId,
-                    'config_exists' => !is_null($this->config)
+            if (!$this->config) {
+                EcommerceLogger::warning('E-commerce configuration not found', [
+                    'tenant_id' => $this->tenantId
                 ]);
                 
                 return [
@@ -55,6 +54,25 @@ class EcommerceOrderService
                     'response' => null
                 ];
             }
+
+            if (!$this->config->isFullyConfigured()) {
+                EcommerceLogger::warning('E-commerce not fully configured', [
+                    'tenant_id' => $this->tenantId,
+                    'is_configured' => $this->config->is_configured,
+                    'has_sheets_url' => !empty($this->config->google_sheets_url),
+                    'sheets_url' => $this->config->google_sheets_url
+                ]);
+                
+                return [
+                    'handled' => false,
+                    'response' => null
+                ];
+            }
+
+            EcommerceLogger::info('E-commerce configuration verified', [
+                'tenant_id' => $this->tenantId,
+                'message' => $message
+            ]);
 
             $this->currentContact = $contact;
             
@@ -161,12 +179,12 @@ Return JSON format:
         $message = strtolower($message);
         
         $patterns = [
-            'browse_products' => ['catalog', 'products', 'show me', 'what do you have', 'browse', 'menu'],
-            'add_to_cart' => ['buy', 'order', 'add', 'purchase', 'i want', 'get me'],
-            'view_cart' => ['cart', 'my order', 'what did i order', 'check order'],
-            'checkout' => ['checkout', 'confirm order', 'place order', 'proceed', 'pay'],
-            'order_status' => ['status', 'where is my order', 'tracking', 'delivered'],
-            'help' => ['help', 'how to', 'assist', 'support']
+            'browse_products' => ['shop', 'catalog', 'products', 'show me', 'what do you have', 'browse', 'menu', 'store', 'buy'],
+            'add_to_cart' => ['add', 'purchase', 'i want', 'get me', 'take'],
+            'view_cart' => ['cart', 'my order', 'what did i order', 'check order', 'my cart'],
+            'checkout' => ['checkout', 'confirm order', 'place order', 'proceed', 'pay', 'complete'],
+            'order_status' => ['status', 'where is my order', 'tracking', 'delivered', 'order status'],
+            'help' => ['help', 'how to', 'assist', 'support', 'info']
         ];
 
         foreach ($patterns as $intent => $keywords) {
