@@ -73,7 +73,7 @@ class EcommerceSettings extends Component
 
     public function mount()
     {
-        if (!checkPermission('tenant.ecommerce.manage')) {
+        if (!checkPermission('tenant.ecommerce.view')) {
             $this->notify(['type' => 'danger', 'message' => t('access_denied_note')], true);
             return redirect()->to(tenant_route('tenant.dashboard'));
         }
