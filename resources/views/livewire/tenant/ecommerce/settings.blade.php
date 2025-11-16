@@ -474,7 +474,7 @@
                                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                                     Headers (paste in row 1):
                                                 </label>
-                                                <button onclick="navigator.clipboard.writeText('{{ implode(\"\t\", $sheetData['headers']) }}')" 
+                                                <button onclick="navigator.clipboard.writeText('{{ implode(chr(9), $sheetData['headers']) }}')" 
                                                         class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
                                                     📋 Copy Headers
                                                 </button>
