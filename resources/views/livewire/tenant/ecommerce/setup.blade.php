@@ -149,6 +149,14 @@
                                 <p><strong>Sheet ID:</strong> {{ $extractedSheetId }}</p>
                             </div>
                         </div>
+
+                        <!-- Debug Test Button -->
+                        <div class="mt-4 text-center">
+                            <button wire:click="testLivewire" 
+                                    class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm">
+                                🔧 Test Livewire Connection
+                            </button>
+                        </div>
                     @endif
                 </div>
 
@@ -346,6 +354,7 @@
                     </button>
 
                     <button wire:click="nextStep" 
+                            onclick="console.log('Next button clicked, current step: {{ $currentStep }}')"
                             class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
                         @if($currentStep == $totalSteps)
                             🚀 Complete Setup

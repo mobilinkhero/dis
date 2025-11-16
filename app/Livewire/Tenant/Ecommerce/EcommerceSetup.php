@@ -85,19 +85,23 @@ class EcommerceSetup extends Component
 
     public function nextStep()
     {
-        if ($this->currentStep == 1) {
-            $this->validateStep1();
-        } elseif ($this->currentStep == 2) {
-            $this->validateStep2();
-        } elseif ($this->currentStep == 3) {
-            $this->validateStep3();
-        } elseif ($this->currentStep == 4) {
-            $this->completeSetup();
-            return;
-        }
+        try {
+            if ($this->currentStep == 1) {
+                $this->validateStep1();
+            } elseif ($this->currentStep == 2) {
+                $this->validateStep2();
+            } elseif ($this->currentStep == 3) {
+                $this->validateStep3();
+            } elseif ($this->currentStep == 4) {
+                $this->completeSetup();
+                return;
+            }
 
-        if ($this->currentStep < $this->totalSteps) {
-            $this->currentStep++;
+            if ($this->currentStep < $this->totalSteps) {
+                $this->currentStep++;
+            }
+        } catch (\Exception $e) {
+            $this->notify(['type' => 'danger', 'message' => 'Navigation error: ' . $e->getMessage()]);
         }
     }
 
@@ -106,6 +110,11 @@ class EcommerceSetup extends Component
         if ($this->currentStep > 1) {
             $this->currentStep--;
         }
+    }
+
+    public function testLivewire()
+    {
+        $this->notify(['type' => 'success', 'message' => 'Livewire is working! Current step: ' . $this->currentStep]);
     }
 
     public function validateStep1()
@@ -130,10 +139,27 @@ class EcommerceSetup extends Component
 
     public function validateStep2()
     {
-        if (!$this->sheetsValid) {
-            $this->addError('googleSheetsUrl', 'Please validate your Google Sheets URL first');
-            $this->currentStep = 1;
-            return;
+        // If sheets are not already validated, validate them now
+        if (!$this->sheetsValid || empty($this->extractedSheetId)) {
+            if (empty($this->googleSheetsUrl)) {
+                $this->addError('googleSheetsUrl', 'Please enter your Google Sheets URL first');
+                $this->currentStep = 1;
+                return;
+            }
+
+            // Re-validate the Google Sheets URL
+            $sheetsService = new GoogleSheetsService();
+            $validation = $sheetsService->validateSheetsUrl($this->googleSheetsUrl);
+
+            if (!$validation['valid']) {
+                $this->addError('googleSheetsUrl', $validation['message']);
+                $this->currentStep = 1;
+                return;
+            }
+
+            $this->extractedSheetId = $validation['sheet_id'];
+            $this->sheetsValid = true;
+            $this->sheetValidationMessage = $validation['message'];
         }
     }
 
