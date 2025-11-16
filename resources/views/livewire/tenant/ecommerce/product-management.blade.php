@@ -25,7 +25,7 @@
                     </div>
                 </button>
 
-                <a href="{{ route('tenant.ecommerce.setup') }}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <a href="{{ tenant_route('tenant.ecommerce.setup') }}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                     ⚙️ Settings
                 </a>
             </div>
