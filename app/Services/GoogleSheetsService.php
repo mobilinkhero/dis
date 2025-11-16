@@ -228,32 +228,97 @@ class GoogleSheetsService
      */
     public function syncProductsFromSheets(): array
     {
-        if (!$this->config || !$this->config->products_sheet_id) {
+        if (!$this->config || !$this->config->google_sheets_url) {
             return [
                 'success' => false,
-                'message' => 'Products sheet not configured'
+                'message' => 'Google Sheets URL not configured'
+            ];
+        }
+
+        // Extract sheet ID from URL
+        $sheetId = $this->extractSheetId($this->config->google_sheets_url);
+        if (!$sheetId) {
+            return [
+                'success' => false,
+                'message' => 'Invalid Google Sheets URL format'
             ];
         }
 
         try {
-            $csvUrl = "https://docs.google.com/spreadsheets/d/{$this->config->products_sheet_id}/export?format=csv&gid=0";
+            EcommerceLogger::info('Starting product sync from Google Sheets', [
+                'tenant_id' => $this->tenantId,
+                'sheet_id' => $sheetId,
+                'url' => $this->config->google_sheets_url
+            ]);
+
+            // First try to get the Products sheet (gid may vary)
+            // We'll try gid=0 first (usually the first sheet)
+            $csvUrl = "https://docs.google.com/spreadsheets/d/{$sheetId}/export?format=csv&gid=0";
+            
+            EcommerceLogger::info('Fetching CSV from Google Sheets', [
+                'csv_url' => $csvUrl
+            ]);
+
             $response = Http::timeout(30)->get($csvUrl);
 
             if (!$response->successful()) {
+                $errorMessage = 'Failed to fetch products from Google Sheets. Status: ' . $response->status();
+                
+                EcommerceLogger::error('Google Sheets fetch failed', [
+                    'status' => $response->status(),
+                    'body' => substr($response->body(), 0, 500),
+                    'csv_url' => $csvUrl
+                ]);
+
+                // Check if it's a permission issue
+                if ($response->status() === 403) {
+                    $errorMessage = 'Access denied. Please make sure the Google Sheet is shared with "Anyone with the link can view" or shared with the service account.';
+                } elseif ($response->status() === 404) {
+                    $errorMessage = 'Google Sheet not found. Please check the URL is correct.';
+                }
+
                 return [
                     'success' => false,
-                    'message' => 'Failed to fetch products from Google Sheets'
+                    'message' => $errorMessage
                 ];
             }
 
             $csvData = $response->body();
+            
+            EcommerceLogger::info('CSV data fetched successfully', [
+                'data_length' => strlen($csvData),
+                'first_100_chars' => substr($csvData, 0, 100)
+            ]);
+
+            // Check if we got HTML instead of CSV (common when sheet isn't public)
+            if (strpos($csvData, '<!DOCTYPE') !== false || strpos($csvData, '<html') !== false) {
+                EcommerceLogger::error('Received HTML instead of CSV - likely a permission issue');
+                return [
+                    'success' => false,
+                    'message' => 'Unable to access sheet data. Please ensure the sheet is shared with "Anyone with the link can view".'
+                ];
+            }
+
             $lines = str_getcsv($csvData, "\n");
+            
+            if (empty($lines)) {
+                return [
+                    'success' => false,
+                    'message' => 'No data found in the Google Sheet. Please add products to the sheet first.'
+                ];
+            }
+
             $header = str_getcsv(array_shift($lines));
+            
+            EcommerceLogger::info('Processing sheet data', [
+                'headers' => $header,
+                'row_count' => count($lines)
+            ]);
             
             $syncedCount = 0;
             $errorCount = 0;
 
-            foreach ($lines as $line) {
+            foreach ($lines as $lineIndex => $line) {
                 if (empty(trim($line))) continue;
                 
                 try {
@@ -261,7 +326,11 @@ class GoogleSheetsService
                     $this->syncProduct($data);
                     $syncedCount++;
                 } catch (\Exception $e) {
-                    Log::error('Product sync error: ' . $e->getMessage(), ['line' => $line]);
+                    EcommerceLogger::error('Product sync error', [
+                        'line_index' => $lineIndex,
+                        'error' => $e->getMessage(),
+                        'line_data' => $line
+                    ]);
                     $errorCount++;
                 }
             }
@@ -272,6 +341,12 @@ class GoogleSheetsService
                 'last_sync_at' => Carbon::now()
             ]);
 
+            EcommerceLogger::info('Product sync completed successfully', [
+                'tenant_id' => $this->tenantId,
+                'synced_count' => $syncedCount,
+                'error_count' => $errorCount
+            ]);
+
             return [
                 'success' => true,
                 'message' => "Synced {$syncedCount} products successfully. {$errorCount} errors.",
@@ -280,7 +355,12 @@ class GoogleSheetsService
             ];
 
         } catch (\Exception $e) {
-            Log::error('Products sync error: ' . $e->getMessage());
+            EcommerceLogger::error('Products sync failed with exception', [
+                'tenant_id' => $this->tenantId,
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return [
                 'success' => false,
                 'message' => 'Error syncing products: ' . $e->getMessage()
