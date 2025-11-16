@@ -10,6 +10,8 @@ use Livewire\Component;
 class EcommerceSettings extends Component
 {
     public $config;
+    public $generatedScript = '';
+    public $showScriptModal = false;
     public $settings = [
         'currency' => 'USD',
         'tax_rate' => '0.00',
@@ -205,9 +207,16 @@ class EcommerceSettings extends Component
             if ($result['success']) {
                 EcommerceLogger::info('Sheet sync completed successfully', [
                     'tenant_id' => tenant_id(),
-                    'created_sheets' => $result['created_sheets'] ?? []
+                    'created_sheets' => $result['required_sheets'] ?? []
                 ]);
-                $this->notify(['type' => 'success', 'message' => $result['message']]);
+                
+                // Read the generated Apps Script and show it to the user
+                if (isset($result['apps_script_file']) && file_exists($result['apps_script_file'])) {
+                    $this->generatedScript = file_get_contents($result['apps_script_file']);
+                    $this->showScriptModal = true;
+                }
+                
+                $this->notify(['type' => 'success', 'message' => 'Apps Script generated successfully! Please follow the instructions in the popup.']);
             } else {
                 EcommerceLogger::error('Sheet sync failed', [
                     'tenant_id' => tenant_id(),
@@ -223,6 +232,12 @@ class EcommerceSettings extends Component
             ]);
             $this->notify(['type' => 'danger', 'message' => 'Sheet sync failed: ' . $e->getMessage()]);
         }
+    }
+
+    public function closeScriptModal()
+    {
+        $this->showScriptModal = false;
+        $this->generatedScript = '';
     }
 
     protected function getDefaultOrderMessage()

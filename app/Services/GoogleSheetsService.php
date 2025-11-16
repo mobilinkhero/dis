@@ -126,35 +126,46 @@ class GoogleSheetsService
             // Get required sheets structure
             $requiredSheets = $this->createDefaultSheets();
             
-            // For demonstration, we'll simulate sheet checking and creation
-            // In production, this would use Google Sheets API
-            $createdSheets = [];
-            $message = 'Sheet validation completed successfully. ';
-
-            // Simulate creating all required sheets
-            foreach ($requiredSheets as $sheetName => $sheetData) {
-                EcommerceLogger::info("Processing sheet: {$sheetName}", [
-                    'tenant_id' => $config->tenant_id,
-                    'columns_count' => count($sheetData['columns'])
-                ]);
-                
-                $createdSheets[] = $sheetName;
-            }
-
-            if (!empty($createdSheets)) {
-                $message .= 'Verified/Created sheets: ' . implode(', ', $createdSheets) . '. ';
-                $message .= 'All sheets now have the correct column structure for e-commerce data.';
-            }
-
-            EcommerceLogger::info('Sheet validation completed', [
+            // Generate Google Apps Script code for sheet creation
+            $appsScriptCode = $this->generateAppsScriptCode($requiredSheets);
+            
+            // Log the Apps Script code for manual execution
+            EcommerceLogger::info('Generated Apps Script for sheet creation', [
                 'tenant_id' => $config->tenant_id,
-                'processed_sheets' => $createdSheets
+                'spreadsheet_id' => $spreadsheetId,
+                'apps_script' => $appsScriptCode
+            ]);
+
+            // Save the Apps Script code to a file for easy access
+            $scriptFile = storage_path('app/ecommerce_sheets_script.js');
+            file_put_contents($scriptFile, $appsScriptCode);
+
+            $message = "Sheet validation completed. To create the required sheets:\n\n";
+            $message .= "1. Open your Google Sheet: " . $config->google_sheets_url . "\n";
+            $message .= "2. Go to Extensions → Apps Script\n";
+            $message .= "3. Replace the default code with the script from: {$scriptFile}\n";
+            $message .= "4. Save and run the script\n\n";
+            $message .= "This will automatically create the following sheets with proper columns:\n";
+            
+            foreach ($requiredSheets as $sheetName => $sheetData) {
+                $message .= "- {$sheetName} (" . count($sheetData['columns']) . " columns)\n";
+                
+                EcommerceLogger::info("Prepared sheet structure: {$sheetName}", [
+                    'tenant_id' => $config->tenant_id,
+                    'columns' => $sheetData['columns']
+                ]);
+            }
+
+            EcommerceLogger::info('Sheet validation completed - Apps Script generated', [
+                'tenant_id' => $config->tenant_id,
+                'script_file' => $scriptFile
             ]);
 
             return [
                 'success' => true,
                 'message' => $message,
-                'created_sheets' => $createdSheets
+                'apps_script_file' => $scriptFile,
+                'required_sheets' => array_keys($requiredSheets)
             ];
 
         } catch (\Exception $e) {
@@ -169,6 +180,47 @@ class GoogleSheetsService
                 'message' => 'Failed to validate sheets: ' . $e->getMessage()
             ];
         }
+    }
+
+    /**
+     * Generate Google Apps Script code to create required sheets
+     */
+    protected function generateAppsScriptCode(array $requiredSheets): string
+    {
+        $script = "function createEcommerceSheets() {\n";
+        $script .= "  var ss = SpreadsheetApp.getActiveSpreadsheet();\n";
+        $script .= "  var existingSheets = ss.getSheets().map(sheet => sheet.getName());\n\n";
+        
+        foreach ($requiredSheets as $sheetName => $sheetData) {
+            $script .= "  // Create {$sheetName} sheet\n";
+            $script .= "  if (!existingSheets.includes('{$sheetName}')) {\n";
+            $script .= "    var {$sheetName}Sheet = ss.insertSheet('{$sheetName}');\n";
+            $script .= "    var headers = ['" . implode("', '", $sheetData['columns']) . "'];\n";
+            $script .= "    {$sheetName}Sheet.getRange(1, 1, 1, headers.length).setValues([headers]);\n";
+            $script .= "    {$sheetName}Sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');\n";
+            $script .= "    {$sheetName}Sheet.getRange(1, 1, 1, headers.length).setBackground('#4285F4');\n";
+            $script .= "    {$sheetName}Sheet.getRange(1, 1, 1, headers.length).setFontColor('#FFFFFF');\n";
+            
+            // Add sample data
+            if (!empty($sheetData['sample_data'])) {
+                $sampleRow = $sheetData['sample_data'][0];
+                $script .= "    var sampleData = ['" . implode("', '", $sampleRow) . "'];\n";
+                $script .= "    {$sheetName}Sheet.getRange(2, 1, 1, sampleData.length).setValues([sampleData]);\n";
+            }
+            
+            $script .= "    {$sheetName}Sheet.autoResizeColumns(1, headers.length);\n";
+            $script .= "    Logger.log('Created {$sheetName} sheet with ' + headers.length + ' columns');\n";
+            $script .= "  } else {\n";
+            $script .= "    Logger.log('{$sheetName} sheet already exists');\n";
+            $script .= "  }\n\n";
+        }
+        
+        $script .= "  Logger.log('E-commerce sheets setup completed!');\n";
+        $script .= "}\n\n";
+        $script .= "// Run this function to create all required e-commerce sheets\n";
+        $script .= "// Generated by WhatsMark E-commerce System\n";
+        
+        return $script;
     }
 
     /**

@@ -16,7 +16,31 @@ class EcommerceLogger
      */
     public static function log($level, $message, $context = [])
     {
-        $homeDir = $_SERVER['HOME'] ?? '/home/default';
+        // Try multiple possible home directories
+        $possibleHomeDirs = [
+            $_SERVER['HOME'] ?? null,
+            $_SERVER['USERPROFILE'] ?? null,
+            '/home/' . ($_SERVER['USER'] ?? 'default'),
+            getcwd(), // Current working directory as fallback
+            storage_path('logs') // Laravel storage as final fallback
+        ];
+        
+        $homeDir = null;
+        foreach ($possibleHomeDirs as $dir) {
+            if ($dir && is_dir($dir) && is_writable($dir)) {
+                $homeDir = $dir;
+                break;
+            }
+        }
+        
+        // If no writable directory found, use Laravel storage and create it
+        if (!$homeDir) {
+            $homeDir = storage_path('logs');
+            if (!is_dir($homeDir)) {
+                mkdir($homeDir, 0755, true);
+            }
+        }
+        
         $logFile = $homeDir . '/ecomorcelog.log';
         
         $timestamp = Carbon::now()->format('Y-m-d H:i:s');
@@ -30,12 +54,12 @@ class EcommerceLogger
             $contextStr ? "\nContext: " . $contextStr : ''
         );
         
-        // Write to home directory
+        // Write to log file
         try {
             file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
         } catch (\Exception $e) {
-            // Fallback to Laravel log if home directory fails
-            Log::channel('ecommerce')->error("Failed to write to home log: " . $e->getMessage());
+            // Fallback to Laravel log if file writing fails
+            Log::channel('ecommerce')->error("Failed to write to ecommerce log at {$logFile}: " . $e->getMessage());
         }
         
         // Also log to Laravel's e-commerce channel
