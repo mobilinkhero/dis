@@ -263,7 +263,9 @@ class WhatsAppWebhookController extends Controller
                                 $ecommerceMessage = [
                                     'type' => 'text',
                                     'message' => $ecommerceResult['response'],
+                                    'rel_type' => $contact_data->type ?? 'lead',
                                     'rel_id' => $contact_data->id,
+                                    'tenant_id' => $this->tenant_id,
                                 ];
                                 
                                 $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $ecommerceMessage, $metadata['phone_number_id']);
