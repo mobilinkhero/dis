@@ -246,6 +246,52 @@
         </div>
     </div>
 
+    <!-- Service Account Status -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mt-6">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">🔑 Global Service Account Status</h3>
+        
+        <div class="mb-4">
+            @if(isset($serviceAccountStatus['configured']) && $serviceAccountStatus['configured'])
+                <div class="flex items-center p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <svg class="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+                    </svg>
+                    <div>
+                        <p class="text-green-800 dark:text-green-200 font-medium">✅ Service Account Active</p>
+                        <p class="text-green-600 dark:text-green-300 text-sm">
+                            {{ $serviceAccountStatus['email'] ?? 'Global service account configured' }}<br>
+                            <span class="text-xs">One-click sheet creation is fully automated!</span>
+                        </p>
+                    </div>
+                </div>
+            @else
+                <div class="flex items-center p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                    <svg class="w-5 h-5 text-orange-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"/>
+                    </svg>
+                    <div>
+                        <p class="text-orange-800 dark:text-orange-200 font-medium">⚠️ Service Account Not Configured</p>
+                        <p class="text-orange-600 dark:text-orange-300 text-sm">
+                            System administrator needs to configure the global service account.<br>
+                            <span class="text-xs">Sheet creation will use the fallback import method.</span>
+                        </p>
+                    </div>
+                </div>
+            @endif
+
+            <!-- Information Box -->
+            <div class="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <h4 class="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">ℹ️ About Global Service Account</h4>
+                <div class="text-sm text-blue-800 dark:text-blue-300 space-y-1">
+                    <p><strong>🌐 Global Setup:</strong> One service account handles sheet creation for all tenants</p>
+                    <p><strong>🔒 Security:</strong> Configured server-side by system administrators</p>
+                    <p><strong>⚡ Benefits:</strong> Instant sheet creation without individual setup required</p>
+                    <p><strong>🛠️ Admin Note:</strong> Place <code>google-service-account.json</code> in the project root</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Actions -->
     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mt-6">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
@@ -253,7 +299,7 @@
         <div class="flex gap-3 flex-wrap mb-4">
             <button wire:click="syncSheets" 
                     class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                🔧 Check & Create Sheets
+                ⚡ One-Click Create Sheets
             </button>
             
             <button wire:click="syncWithGoogleSheets" 
@@ -276,14 +322,20 @@
         <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <h4 class="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">📋 Sheet Sync Guide</h4>
             <div class="space-y-2 text-sm text-blue-800 dark:text-blue-300">
-                <p><strong>🔧 Check & Create Sheets:</strong> Automatically creates these sheets in your Google Sheets if they don't exist:</p>
+                <p><strong>⚡ One-Click Create Sheets:</strong> Automatically creates all required sheets with proper structure:</p>
                 <ul class="list-disc list-inside ml-4 space-y-1">
                     <li><strong>Products</strong> - ID, Name, SKU, Description, Price, Category, Stock, etc.</li>
                     <li><strong>Orders</strong> - Order Number, Customer Info, Items, Payment Status, etc.</li>
                     <li><strong>Customers</strong> - Phone, Name, Email, Order History, etc.</li>
                 </ul>
                 <p><strong>🔄 Sync Data:</strong> Imports existing data from your Google Sheets into the system.</p>
-                <p class="text-xs opacity-75">💡 Tip: Run "Check & Create Sheets" first to ensure your Google Sheet has the correct structure!</p>
+                
+                <div class="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded border border-green-200 dark:border-green-800">
+                    <p class="text-xs text-green-800 dark:text-green-200">
+                        <strong>✨ With Service Account:</strong> Fully automatic - creates sheets, adds headers, formats, and adds sample data instantly!<br>
+                        <strong>🔄 Without Service Account:</strong> Smart fallback with copy-paste ready data and CSV downloads.
+                    </p>
+                </div>
             </div>
         </div>
     </div>
@@ -369,5 +421,125 @@
                 </div>
             </div>
         </div>
+    @endif
+
+    <!-- Import Modal -->
+    @if($showImportModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="closeImportModal"></div>
+
+                <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
+                    <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="flex items-start justify-between mb-4">
+                            <div>
+                                <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                                    📋 Manual Sheet Creation - Copy & Paste Method
+                                </h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                    Follow these steps to manually create the required sheets
+                                </p>
+                            </div>
+                            <button wire:click="closeImportModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Instructions -->
+                        <div class="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                            <h4 class="text-sm font-semibold text-yellow-900 dark:text-yellow-200 mb-2">📋 Quick Setup Instructions:</h4>
+                            <ol class="text-sm text-yellow-800 dark:text-yellow-300 space-y-2">
+                                <li><strong>1.</strong> Open your Google Sheet: <a href="{{ $config->google_sheets_url ?? '#' }}" target="_blank" class="underline hover:no-underline">Click here</a></li>
+                                <li><strong>2.</strong> For each sheet below, create a new tab with the exact name</li>
+                                <li><strong>3.</strong> Copy the headers and paste them in row 1</li>
+                                <li><strong>4.</strong> Copy the sample data and paste it in row 2</li>
+                                <li><strong>5.</strong> Save and you're done!</li>
+                            </ol>
+                        </div>
+
+                        <!-- Sheet Data -->
+                        @if(!empty($importData))
+                            <div class="space-y-6">
+                                @foreach($importData as $sheetName => $sheetData)
+                                    <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                                            📊 {{ $sheetName }} Sheet
+                                        </h4>
+                                        
+                                        <!-- Headers -->
+                                        <div class="mb-3">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                    Headers (paste in row 1):
+                                                </label>
+                                                <button onclick="navigator.clipboard.writeText('{{ implode(\"\t\", $sheetData['headers']) }}')" 
+                                                        class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
+                                                    📋 Copy Headers
+                                                </button>
+                                            </div>
+                                            <div class="p-2 bg-gray-50 dark:bg-gray-700 rounded border text-sm font-mono">
+                                                {{ implode(' | ', $sheetData['headers']) }}
+                                            </div>
+                                        </div>
+
+                                        <!-- Sample Data -->
+                                        @if(!empty($sheetData['sample_data']))
+                                            <div class="mb-3">
+                                                <div class="flex items-center justify-between mb-2">
+                                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                        Sample Data (paste in row 2):
+                                                    </label>
+                                                    <button onclick="navigator.clipboard.writeText('{{ implode(\"\t\", $sheetData['sample_data'][0]) }}')" 
+                                                            class="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700">
+                                                        📋 Copy Sample
+                                                    </button>
+                                                </div>
+                                                <div class="p-2 bg-gray-50 dark:bg-gray-700 rounded border text-sm font-mono">
+                                                    {{ implode(' | ', $sheetData['sample_data'][0]) }}
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        <!-- CSV Download -->
+                                        <div class="mt-3">
+                                            <button onclick="downloadCSV('{{ $sheetName }}', `{{ $sheetData['csv_content'] }}`)" 
+                                                    class="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700">
+                                                💾 Download {{ $sheetName }}.csv
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button wire:click="closeImportModal" 
+                                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            Done!
+                        </button>
+                        <a href="{{ $config->google_sheets_url ?? '#' }}" 
+                           target="_blank"
+                           class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-700">
+                            🔗 Open Google Sheet
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function downloadCSV(sheetName, csvContent) {
+                const element = document.createElement('a');
+                const file = new Blob([csvContent], {type: 'text/csv'});
+                element.href = URL.createObjectURL(file);
+                element.download = sheetName.toLowerCase() + '_import.csv';
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+            }
+        </script>
     @endif
 </div>

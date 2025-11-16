@@ -152,7 +152,6 @@ if (! function_exists('set_settings_batch')) {
     {
         try {
             $settingsClasses = get_settings_classes();
-
             if (! isset($settingsClasses[$group])) {
                 return false;
             }

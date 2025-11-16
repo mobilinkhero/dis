@@ -28,6 +28,19 @@ class ModuleList extends Component
 
     public $overrideStates = []; // Store overridden module states
 
+    // Envato validation modal properties
+    public $showEnvatoModal = false;
+
+    public $envatoUsername = '';
+
+    public $envatoPurchaseCode = '';
+
+    public $moduleToActivate = '';
+
+    public $envatoValidationErrors = [];
+
+    public $envatoResponse = '';
+
     protected $queryString = [
         'search' => ['except' => ''],
         'sortField' => ['except' => 'name'],
@@ -116,13 +129,21 @@ class ModuleList extends Component
 
     public function activateModule($name)
     {
-        // Directly activate the module without Envato validation
-        $response = $this->performModuleActivation($name);
+        // Check if module requires Envato validation
+        $hooksService = app('module.hooks');
+        if ($hooksService->requiresEnvatoValidation($name)) {
+            // Show the Envato validation modal
+            $this->moduleToActivate = $name;
+            $this->showEnvatoModal = true;
+            $this->envatoResponse = '';
+            $this->envatoUsername = '';
+            $this->envatoPurchaseCode = '';
 
-        $this->notify([
-            'type' => ($response['success']) ? 'success' : 'danger',
-            'message' => $response['message'],
-        ]);
+            return;
+        }
+
+        // Direct activation for core modules or modules that don't require validation
+        $this->performModuleActivation($name);
     }
 
     public function performModuleActivation($name, $validationData = [])
@@ -130,6 +151,55 @@ class ModuleList extends Component
         $response = ModuleManager::activate($name, [], $validationData);
 
         return $response;
+    }
+
+    protected function rules()
+    {
+        return [
+            'envatoUsername' => ['required', 'string', 'max:255'],
+            'envatoPurchaseCode' => ['required', 'string', 'regex:/^([a-f0-9]{8})-(([a-f0-9]{4})-){3}([a-f0-9]{12})$/i'],
+        ];
+    }
+
+    protected function messages()
+    {
+        return [
+            'envatoUsername.required' => 'Envato username is required.',
+            'envatoPurchaseCode.required' => 'Purchase code is required.',
+            'envatoPurchaseCode.regex' => 'Invalid purchase code format. It should be in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+        ];
+    }
+
+    public function validateAndActivateModule()
+    {
+        $validatedData = $this->validate();
+        // Prepare validation data
+        $validationData = [
+            'envato_username' => $this->envatoUsername,
+            'envato_purchase_code' => $this->envatoPurchaseCode,
+        ];
+
+        // Attempt to activate the module with validation
+        $result = $this->performModuleActivation($this->moduleToActivate, $validationData);
+
+        $this->envatoResponse = $result;
+        if ($result['success']) {
+            $this->notify([
+                'type' => 'success',
+                'message' => $result['message'],
+            ]);
+            $this->closeEnvatoModal();
+        }
+    }
+
+    public function closeEnvatoModal()
+    {
+        $this->showEnvatoModal = false;
+        $this->envatoUsername = '';
+        $this->envatoPurchaseCode = '';
+        $this->moduleToActivate = '';
+        $this->envatoValidationErrors = [];
+        $this->envatoResponse = '';
     }
 
     public function deactivateModule($name)
@@ -214,7 +284,7 @@ class ModuleList extends Component
 
         $this->notify([
             'type' => 'success',
-            'message' => 'Database Upgraded Successfully',
+            'message' => t('database_upgraded_successfully'),
         ]);
     }
 
@@ -246,6 +316,8 @@ class ModuleList extends Component
                     return isset($module['info']['type']) && $module['info']['type'] === 'core';
                 } elseif ($this->type === 'addon') {
                     return ! isset($module['info']['type']) || $module['info']['type'] === 'addon';
+                } elseif ($this->type === 'custom') {
+                    return isset($module['info']['type']) && $module['info']['type'] === 'custom';
                 }
 
                 return true;

@@ -4,17 +4,16 @@ namespace PowerComponents\LivewirePowerGrid\Traits;
 
 use Exception;
 use Illuminate\Bus\Batch;
-use Illuminate\Database\Eloquent;
-use Illuminate\Support;
-use Illuminate\Support\{Collection, Str};
+use Illuminate\Database\Eloquent as Eloquent;
+use Illuminate\Support as Support;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\{Collection, Str};
 use PowerComponents\LivewirePowerGrid\Components\Exports\Export;
-use PowerComponents\LivewirePowerGrid\{Components\SetUp\Exportable,
-    DataSource\DataTransformer,
-    DataSource\ProcessDataSource,
-    DataSource\Processors\Database\Handlers\FilterHandler,
-    DataSource\Processors\Database\Handlers\SearchHandler};
+use PowerComponents\LivewirePowerGrid\DataSource\Builder;
 use PowerComponents\LivewirePowerGrid\Jobs\ExportJob;
+use PowerComponents\LivewirePowerGrid\{Components\SetUp\Exportable,
+    DataSource\ProcessDataSource,
+    DataSource\Processors\DataSourceBase};
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
@@ -62,7 +61,7 @@ trait WithExport
 
         $this->batchFinished = $this->exportBatch->finished();
         $this->batchProgress = $this->exportBatch->progress();
-        $this->batchErrors = $this->exportBatch->hasFailures();
+        $this->batchErrors   = $this->exportBatch->hasFailures();
 
         if ($this->batchFinished) {
             $this->batchExporting = false;
@@ -82,7 +81,7 @@ trait WithExport
     public function runOnQueue(string $exportFileType, string $exportType): bool
     {
         $this->batchExporting = true;
-        $this->batchFinished = false;
+        $this->batchFinished  = false;
 
         $queues = $this->putQueuesToBus($exportFileType, $exportType);
 
@@ -107,31 +106,31 @@ trait WithExport
         $processDataSource = tap(ProcessDataSource::make($this), fn ($datasource) => $datasource->get());
 
         $this->exportedFiles = [];
-        $filters = $processDataSource?->component?->filters ?? [];
-        $filtered = $processDataSource?->component?->filtered ?? [];
-        $queues = collect([]);
-        $queueCount = $this->total > $this->getQueuesCount() ? $this->getQueuesCount() : 1;
+        $filters             = $processDataSource?->component?->filters ?? [];
+        $filtered            = $processDataSource?->component?->filtered ?? [];
+        $queues              = collect([]);
+        $queueCount          = $this->total > $this->getQueuesCount() ? $this->getQueuesCount() : 1;
 
         $perPage = (int) ceil($this->total / $queueCount);
 
         $offset = 0;
 
         for ($i = 1; $i <= $queueCount; $i++) {
-            $fileName = Str::kebab(strval(data_get($this->setUp, 'exportable.fileName'))).
-                '-'.round(($offset + 1), 2).
-                '-'.round(($offset + $perPage), 2).
-                '-'.$this->getId().
-                '.'.$fileExtension;
+            $fileName = Str::kebab(strval(data_get($this->setUp, 'exportable.fileName'))) .
+                '-' . round(($offset + 1), 2) .
+                '-' . round(($offset + $perPage), 2) .
+                '-' . $this->getId() .
+                '.' . $fileExtension;
 
             $params = [
-                'filtered' => $filtered,
+                'filtered'        => $filtered,
                 'exportableClass' => $exportableClass,
-                'fileName' => $fileName,
-                'offset' => $offset,
-                'limit' => $perPage,
-                'filters' => Support\Facades\Crypt::encrypt($filters),
-                'exportable' => $processDataSource?->component->setUp['exportable'],
-                'parameters' => Support\Facades\Crypt::encrypt($processDataSource->component->getPublicPropertiesDefinedInComponent()),
+                'fileName'        => $fileName,
+                'offset'          => $offset,
+                'limit'           => $perPage,
+                'filters'         => Support\Facades\Crypt::encrypt($filters),
+                'exportable'      => $processDataSource?->component->setUp['exportable'],
+                'parameters'      => Support\Facades\Crypt::encrypt($processDataSource->component->getPublicPropertiesDefinedInComponent()),
             ];
 
             $queues->push(new $this->exportableJobClass(
@@ -148,13 +147,21 @@ trait WithExport
         return $queues;
     }
 
-    protected function onBatchExecuting(Batch $batch): void {}
+    protected function onBatchExecuting(Batch $batch): void
+    {
+    }
 
-    protected function onBatchThen(Batch $batch): void {}
+    protected function onBatchThen(Batch $batch): void
+    {
+    }
 
-    protected function onBatchCatch(Batch $batch, Throwable $e): void {}
+    protected function onBatchCatch(Batch $batch, Throwable $e): void
+    {
+    }
 
-    protected function onBatchFinally(Batch $batch): void {}
+    protected function onBatchFinally(Batch $batch): void
+    {
+    }
 
     /**
      * @throws Exception
@@ -171,17 +178,13 @@ trait WithExport
 
         if ($processDataSource->component->datasource() instanceof Collection) {
             if ($filtered) {
-                $results = $processDataSource->get(isExport: true)['results']
+                $results = $processDataSource->get(isExport: true)
                     ->whereIn($this->primaryKey, $filtered);
 
-                $dataTransformer = new DataTransformer($processDataSource->component);
-
-                return $dataTransformer->transform($results)->collection;
+                return DataSourceBase::transform($results, $this);
             }
 
-            $dataTransformer = new DataTransformer($processDataSource->component);
-
-            return $dataTransformer->transform($processDataSource->component->datasource())->collection;
+            return DataSourceBase::transform($processDataSource->component->datasource(), $this);
         }
 
         /** @phpstan-ignore-next-line */
@@ -192,30 +195,22 @@ trait WithExport
 
             return Support\Str::of($property)->contains('.')
                 ? $property
-                : $currentTable.'.'.$property;
+                : $currentTable . '.' . $property;
         };
 
-        $queryOptions = data_get($this->setUp, 'exportable.queryOptions', []);
-
         $results = $processDataSource->component->datasource()
-            ->where(function ($query) {
-                (new SearchHandler($this))->apply($query);
-                (new FilterHandler($this))->apply($query);
-            })
+            ->where(
+                fn ($query) => Builder::make($query, $this)
+                    ->filterContains()
+                    ->filter()
+            )
             ->when($filtered, function ($query, $filtered) use ($property) {
                 return $query->whereIn($property('primaryKey'), $filtered);
             })
-            ->when($this->sortField, function ($query) use ($property, $processDataSource, $queryOptions) {
-                $sortField = $queryOptions['sortField'] ?? $property('sortField');
-                $sortDirection = $queryOptions['sortDirection'] ?? $processDataSource->component->sortDirection;
-
-                return $query->orderBy($sortField, $sortDirection);
-            })
+            ->orderBy($property('sortField'), $processDataSource->component->sortDirection)
             ->get();
 
-        $dataTransformer = new DataTransformer($processDataSource->component);
-
-        return $dataTransformer->transform($results)->collection;
+        return DataSourceBase::transform($results, $processDataSource->component);
     }
 
     public function exportToXLS(bool $selected = false): BinaryFileResponse|bool
@@ -235,7 +230,7 @@ trait WithExport
     {
         $exportableClass = $this->getExportableClassFromConfig($exportType);
 
-        if ($this->getQueuesCount() > 0 && ! $selected) {
+        if ($this->getQueuesCount() > 0 && !$selected) {
             return $this->runOnQueue($exportableClass, $exportType);
         }
 
@@ -270,7 +265,7 @@ trait WithExport
     {
         $defaultExportable = strval(config('livewire-powergrid.exportable.default'));
 
-        return strval(data_get(config('livewire-powergrid.exportable'), $defaultExportable.'.'.$exportType));
+        return strval(data_get(config('livewire-powergrid.exportable'), $defaultExportable . '.' . $exportType));
     }
 
     private function getQueuesCount(): int

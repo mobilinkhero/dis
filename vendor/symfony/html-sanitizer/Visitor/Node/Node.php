@@ -56,10 +56,10 @@ final class Node implements NodeInterface
         return $this->attributes[$name] ?? null;
     }
 
-    public function setAttribute(string $name, ?string $value, bool $override = false): void
+    public function setAttribute(string $name, ?string $value): void
     {
         // Always use only the first declaration (ease sanitization)
-        if ($override || !\array_key_exists($name, $this->attributes)) {
+        if (!\array_key_exists($name, $this->attributes)) {
             $this->attributes[$name] = $value;
         }
     }

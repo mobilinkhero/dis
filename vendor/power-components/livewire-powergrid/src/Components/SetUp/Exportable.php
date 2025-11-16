@@ -7,7 +7,6 @@ use Livewire\Wireable;
 final class Exportable implements Wireable
 {
     public const TYPE_XLS = 'xlsx';
-
     public const TYPE_CSV = 'csv';
 
     public string $name = 'exportable';
@@ -28,9 +27,9 @@ final class Exportable implements Wireable
 
     public bool $stripTags = false;
 
-    public array $queryOptions = [];
-
-    public function __construct(public string $fileName = 'export') {}
+    public function __construct(public string $fileName = 'export')
+    {
+    }
 
     public function type(string ...$types): self
     {
@@ -93,13 +92,6 @@ final class Exportable implements Wireable
     public function onConnection(string $connection): self
     {
         data_set($this->batchExport, 'onConnection', $connection);
-
-        return $this;
-    }
-
-    public function queryOptions(array $options): self
-    {
-        $this->queryOptions = $options;
 
         return $this;
     }

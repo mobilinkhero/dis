@@ -100,177 +100,176 @@ class ModuleManager
 
         return $module ? $module['active'] : false;
     }
-/**
- * Activate a module.
- *
- * @param  string  $name
- * @param  array  $activationStack  Track modules being activated to prevent circular dependencies
- * @param  array  $validationData  Data for validation (e.g., Envato credentials)
- * @return bool
- */
-public function activate($name, array $activationStack = [], array $validationData = [])
-{
-    if (! $this->has($name)) {
-        app_log("Failed to activate module: {$name} does not exist", 'error', null, [
-            'module' => $name,
-        ]);
 
-        return [
-            'success' => false,
-            'message' => "Failed to activate module: {$name} does not exist",
-        ];
-    }
-
-    // Fire before_activate hook
-    $hooksService = app('module.hooks');
-
-    $response = [];
-    
-    /*
-    if ($hooksService->requiresEnvatoValidation($name)) {
-        if (empty($validationData['envato_username']) || empty($validationData['envato_purchase_code'])) {
-            app_log("Envato validation required for module {$name} but credentials not provided", 'error', null, [
+    /**
+     * Activate a module.
+     *
+     * @param  string  $name
+     * @param  array  $activationStack  Track modules being activated to prevent circular dependencies
+     * @param  array  $validationData  Data for validation (e.g., Envato credentials)
+     * @return bool
+     */
+    public function activate($name, array $activationStack = [], array $validationData = [])
+    {
+        if (! $this->has($name)) {
+            app_log("Failed to activate module: {$name} does not exist", 'error', null, [
                 'module' => $name,
             ]);
 
             return [
                 'success' => false,
-                'message' => "Envato validation required for module {$name} but credentials not provided",
+                'message' => "Failed to activate module: {$name} does not exist",
             ];
         }
 
-        $response = $hooksService->validateEnvatoPurchase($name, $validationData['envato_username'], $validationData['envato_purchase_code']);
-    }
-    */
+        // Fire before_activate hook
+        $hooksService = app('module.hooks');
 
-    // Fire general validation hook
-    if (isset($response['success']) && ! $response['success']) {
-        app_log("Module activation validation failed for {$name}", 'error', null, [
-            'module' => $name,
-        ]);
-
-        return [
-            'success' => false,
-            'message' => $response['message'] ?? "Module activation validation failed for {$name}",
-        ];
-    }
-
-    $hooksService->validateModuleActivation($name);
-
-    // Prevent circular dependencies by tracking the activation stack
-    if (in_array($name, $activationStack)) {
-        app_log("Circular dependency detected when activating module: {$name}", 'error', null, [
-            'module' => $name,
-        ]);
-
-        return [
-            'success' => false,
-            'message' => "Circular dependency detected when activating module: {$name}",
-        ];
-    }
-
-    // Add current module to activation stack
-    $activationStack[] = $name;
-
-    // Get module info
-    $module = $this->get($name);
-
-    // Check for conflicts with active modules
-    $conflicts = $this->checkConflicts($name);
-    if (! empty($conflicts)) {
-        $conflictList = implode(', ', array_keys($conflicts));
-        app_log("{$name} module conflicts with active modules: {$conflictList}", 'error', null, [
-            'module' => $name,
-        ]);
-
-        return [
-            'success' => false,
-            'message' => "{$name} module conflicts with active modules: {$conflictList}",
-        ];
-    }
-
-    // Check and activate dependencies with semantic versioning support
-    $dependencies = $this->parseDependencies($module);
-    foreach ($dependencies as $dependency => $versionConstraint) {
-        // Check if dependency exists
-        if (! $this->has($dependency)) {
-            app_log("Dependency {$dependency} for {$name} module is not installed", 'error', null, [
-                'module' => $name,
-            ]);
-
-            return [
-                'success' => false,
-                'message' => "Dependency {$dependency} for {$name} module is not installed",
-            ];
-        }
-
-        // Get the dependency's version
-        $dependencyModule = $this->get($dependency);
-        $dependencyVersion = $dependencyModule['info']['version'] ?? '1.0.0';
-
-        // Check if the installed version satisfies the constraint
-        if (! SemVer::satisfies($dependencyVersion, $versionConstraint)) {
-            app_log("{$name} module requires {$dependency} {$versionConstraint}, but version {$dependencyVersion} is installed", 'error', null);
-
-            return [
-                'success' => false,
-                'message' => "{$name} module requires {$dependency} {$versionConstraint}, but version {$dependencyVersion} is installed",
-            ];
-        }
-
-        // Activate the dependency if it's not active
-        if (! $this->isActive($dependency)) {
-            if (! $this->activate($dependency, $activationStack)) {
-                app_log("Failed to activate dependency {$dependency} for {$name} module", 'error', null, [
+        $response = [];
+        // Check if validation is required and validate if needed
+        if ($hooksService->requiresEnvatoValidation($name)) {
+            if (empty($validationData['envato_username']) || empty($validationData['envato_purchase_code'])) {
+                app_log("Envato validation required for module {$name} but credentials not provided", 'error', null, [
                     'module' => $name,
                 ]);
 
                 return [
                     'success' => false,
-                    'message' => "Failed to activate dependency {$dependency} for {$name} module",
+                    'message' => "Envato validation required for module {$name} but credentials not provided",
                 ];
             }
+
+            $response = $hooksService->validateEnvatoPurchase($name, $validationData['envato_username'], $validationData['envato_purchase_code']);
         }
-    }
 
-    // Call activate method if module class exists
-    $this->callModuleMethod($name, 'activate');
+        // Fire general validation hook
+        if (isset($response['success']) && ! $response['success']) {
+            app_log("Module activation validation failed for {$name}", 'error', null, [
+                'module' => $name,
+            ]);
 
-    if (! $this->isActive($name)) {
-        // No longer update modules.php config file, rely only on modules_statuses.json
+            return [
+                'success' => false,
+                'message' => $response['message'] ?? "Module activation validation failed for {$name}",
+            ];
+        }
 
-        // Update modules_statuses.json
-        $this->updateModuleStatusesFile($name, true);
+        $hooksService->validateModuleActivation($name);
 
-        // Update in-memory state
-        $this->modules[$name]['active'] = true;
+        // Prevent circular dependencies by tracking the activation stack
+        if (in_array($name, $activationStack)) {
+            app_log("Circular dependency detected when activating module: {$name}", 'error', null, [
+                'module' => $name,
+            ]);
 
-        // Run migrations if configured to do so
-        $autoMigrate = config('modules.auto_migrations.enabled', true);
-        if ($autoMigrate) {
-            $this->runModuleMigrations($name);
+            return [
+                'success' => false,
+                'message' => "Circular dependency detected when activating module: {$name}",
+            ];
+        }
 
-            // Run seeders if configured to do so
-            $autoSeed = config('modules.auto_migrations.seed', true);
-            if ($autoSeed) {
-                $this->runModuleSeeders($name);
+        // Add current module to activation stack
+        $activationStack[] = $name;
+
+        // Get module info
+        $module = $this->get($name);
+
+        // Check for conflicts with active modules
+        $conflicts = $this->checkConflicts($name);
+        if (! empty($conflicts)) {
+            $conflictList = implode(', ', array_keys($conflicts));
+            app_log("{$name} module conflicts with active modules: {$conflictList}", 'error', null, [
+                'module' => $name,
+            ]);
+
+            return [
+                'success' => false,
+                'message' => "{$name} module conflicts with active modules: {$conflictList}",
+            ];
+        }
+
+        // Check and activate dependencies with semantic versioning support
+        $dependencies = $this->parseDependencies($module);
+        foreach ($dependencies as $dependency => $versionConstraint) {
+            // Check if dependency exists
+            if (! $this->has($dependency)) {
+                app_log("Dependency {$dependency} for {$name} module is not installed", 'error', null, [
+                    'module' => $name,
+                ]);
+
+                return [
+                    'success' => false,
+                    'message' => "Dependency {$dependency} for {$name} module is not installed",
+                ];
+            }
+
+            // Get the dependency's version
+            $dependencyModule = $this->get($dependency);
+            $dependencyVersion = $dependencyModule['info']['version'] ?? '1.0.0';
+
+            // Check if the installed version satisfies the constraint
+            if (! SemVer::satisfies($dependencyVersion, $versionConstraint)) {
+                app_log("{$name} module requires {$dependency} {$versionConstraint}, but version {$dependencyVersion} is installed", 'error', null);
+
+                return [
+                    'success' => false,
+                    'message' => "{$name} module requires {$dependency} {$versionConstraint}, but version {$dependencyVersion} is installed",
+                ];
+            }
+
+            // Activate the dependency if it's not active
+            if (! $this->isActive($dependency)) {
+                if (! $this->activate($dependency, $activationStack)) {
+                    app_log("Failed to activate dependency {$dependency} for {$name} module", 'error', null, [
+                        'module' => $name,
+                    ]);
+
+                    return [
+                        'success' => false,
+                        'message' => "Failed to activate dependency {$dependency} for {$name} module",
+                    ];
+                }
             }
         }
 
-        // Call activated method if module class exists
-        $this->callModuleMethod($name, 'activated');
+        // Call activate method if module class exists
+        $this->callModuleMethod($name, 'activate');
 
-        // Clear route cache to ensure routes are registered
-        $this->clearRoutesCache();
+        if (! $this->isActive($name)) {
+            // No longer update modules.php config file, rely only on modules_statuses.json
+
+            // Update modules_statuses.json
+            $this->updateModuleStatusesFile($name, true);
+
+            // Update in-memory state
+            $this->modules[$name]['active'] = true;
+
+            // Run migrations if configured to do so
+            $autoMigrate = config('modules.auto_migrations.enabled', true);
+            if ($autoMigrate) {
+                $this->runModuleMigrations($name);
+
+                // Run seeders if configured to do so
+                $autoSeed = config('modules.auto_migrations.seed', true);
+                if ($autoSeed) {
+                    $this->runModuleSeeders($name);
+                }
+            }
+
+            // Call activated method if module class exists
+            $this->callModuleMethod($name, 'activated');
+
+            // Clear route cache to ensure routes are registered
+            $this->clearRoutesCache();
+        }
+
+        $hooksService->processAfterActivation($name);
+
+        return [
+            'success' => true,
+            'message' => "$name module activated successfully.",
+        ];
     }
-
-    $hooksService->processAfterActivation($name);
-
-    return [
-        'success' => true,
-        'message' => "$name module activated successfully.",
-    ];
-}
 
     /**
      * Deactivate a module.
@@ -340,7 +339,7 @@ public function activate($name, array $activationStack = [], array $validationDa
      * Remove a module.
      *
      * @param  string  $name
-     * @return bool
+     * @return array
      */
     public function remove($name)
     {
@@ -361,7 +360,8 @@ public function activate($name, array $activationStack = [], array $validationDa
 
         // Core module check removed to allow core modules to be removed
 
-        $modulePath = module_path($name);
+        // Use direct path calculation instead of module_path to avoid errors if module is already partially removed
+        $modulePath = base_path('Modules/'.$name);
 
         if (File::exists($modulePath)) {
             // Deactivate the module first if it's active
@@ -449,6 +449,19 @@ public function activate($name, array $activationStack = [], array $validationDa
     }
 
     /**
+     * Check if a module is a custom module.
+     *
+     * @param  string  $name
+     * @return bool
+     */
+    public function isCustom($name)
+    {
+        $module = $this->get($name);
+
+        return $module && isset($module['info']['type']) && $module['info']['type'] === 'custom';
+    }
+
+    /**
      * Load all active modules.
      *
      * @return void
@@ -473,7 +486,8 @@ public function activate($name, array $activationStack = [], array $validationDa
         if ($providerClass) {
             $this->app->register($providerClass);
         } else {
-            $providerPath = module_path($name, 'src/Providers/ModuleServiceProvider.php');
+            // Use _module_path helper instead of module_path to avoid errors
+            $providerPath = _module_path($name, 'src/Providers/ModuleServiceProvider.php');
 
             if (File::exists($providerPath)) {
                 $namespace = config('modules.namespaces.modules')."\\{$name}\\src\\Providers\\ModuleServiceProvider";
@@ -539,7 +553,7 @@ public function activate($name, array $activationStack = [], array $validationDa
                 }
 
                 // Ensure type is either 'core' or 'addon', default to 'addon'
-                if (! isset($info['type']) || ! in_array($info['type'], ['core', 'addon'])) {
+                if (! isset($info['type']) || ! in_array($info['type'], ['core', 'addon', 'custom'])) {
                     $info['type'] = 'addon';
                 }
 

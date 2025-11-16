@@ -2,6 +2,10 @@
 
 namespace PowerComponents\LivewirePowerGrid\DataSource;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorInterface;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Pagination\{LengthAwarePaginator, Paginator};
+use Illuminate\Support\Collection as BaseCollection;
 use PowerComponents\LivewirePowerGrid\DataSource\{Processors\CollectionProcessor,
     Processors\ModelProcessor,
     Processors\ScoutBuilderProcessor};
@@ -13,7 +17,8 @@ class ProcessDataSource
     public function __construct(
         public PowerGridComponent $component,
         public array $properties = [],
-    ) {}
+    ) {
+    }
 
     public static function make(PowerGridComponent $powerGridComponent, array $properties = []): ProcessDataSource
     {
@@ -23,7 +28,7 @@ class ProcessDataSource
     /**
      * @throws Throwable
      */
-    public function get(bool $isExport = false): array
+    public function get(bool $isExport = false): BaseCollection|LengthAwarePaginator|LengthAwarePaginatorInterface|Paginator|MorphToMany
     {
         $processors = [
             CollectionProcessor::class,
@@ -31,11 +36,11 @@ class ProcessDataSource
         ];
 
         foreach ($processors as $processor) {
-            // @phpstan-ignore-next-line
+            /** @var DataSourceProcessorInterface $processor */
             if ($processor::match($this->component->datasource($this->properties))) {
                 $instance = new $processor($this->component, $isExport);
 
-                return $instance->process();
+                return $instance->process(); // @phpstan-ignore-line
             }
         }
 

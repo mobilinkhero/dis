@@ -4,7 +4,7 @@ namespace Knuckles\Scribe\Writing\OpenApiSpecGenerators;
 
 use Illuminate\Support\Arr;
 
-class OverridesGenerator extends OpenApiGenerator
+class OverridesGenerator extends BaseGenerator
 {
     public function root(array $root, array $groupedEndpoints): array
     {

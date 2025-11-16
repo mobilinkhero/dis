@@ -145,8 +145,7 @@ class PostmanCollectionWriter
         }
 
         $endpointItem = [
-            'name' => ($endpoint->metadata->title !== '' ? $endpoint->metadata->title : ($endpoint->httpMethods[0].' '.$endpoint->uri))
-                .($endpoint->metadata->deprecated ? ' [DEPRECATED]' : ''),
+            'name' => $endpoint->metadata->title !== '' ? $endpoint->metadata->title : ($endpoint->httpMethods[0].' '.$endpoint->uri),
             'request' => [
                 'url' => $this->generateUrlObject($endpoint),
                 'method' => $method,

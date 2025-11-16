@@ -4,14 +4,22 @@ namespace App\Livewire\Tenant\Ecommerce;
 
 use App\Models\Tenant\EcommerceConfiguration;
 use App\Services\GoogleSheetsService;
+use App\Services\GoogleSheetsDirectApiService;
+use App\Services\GoogleSheetsServiceAccountService;
 use App\Services\EcommerceLogger;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class EcommerceSettings extends Component
 {
+    use WithFileUploads;
+
     public $config;
     public $generatedScript = '';
     public $showScriptModal = false;
+    public $showImportModal = false;
+    public $importData = [];
+    public $serviceAccountStatus = [];
     public $settings = [
         'currency' => 'USD',
         'tax_rate' => '0.00',
@@ -82,6 +90,7 @@ class EcommerceSettings extends Component
         }
 
         $this->loadSettings();
+        $this->checkServiceAccountStatus();
     }
 
     public function loadSettings()
@@ -196,41 +205,51 @@ class EcommerceSettings extends Component
                 return;
             }
 
-            EcommerceLogger::info('Sheet sync initiated from settings page', [
+            EcommerceLogger::info('One-click sheet creation initiated', [
                 'tenant_id' => tenant_id(),
                 'user_id' => auth()->id()
             ]);
 
-            $sheetsService = new GoogleSheetsService();
-            $result = $sheetsService->checkAndCreateSheets($this->config);
+            // Try Service Account first (fully automatic)
+            $serviceAccountService = new GoogleSheetsServiceAccountService();
+            $result = $serviceAccountService->createEcommerceSheetsAutomatic($this->config);
+            
+            // If Service Account fails, fall back to import method
+            if (!$result['success']) {
+                $apiService = new GoogleSheetsDirectApiService();
+                $result = $apiService->createEcommerceSheetsOneClick($this->config);
+            }
             
             if ($result['success']) {
-                EcommerceLogger::info('Sheet sync completed successfully', [
-                    'tenant_id' => tenant_id(),
-                    'created_sheets' => $result['required_sheets'] ?? []
-                ]);
-                
-                // Read the generated Apps Script and show it to the user
-                if (isset($result['apps_script_file']) && file_exists($result['apps_script_file'])) {
-                    $this->generatedScript = file_get_contents($result['apps_script_file']);
-                    $this->showScriptModal = true;
+                if (isset($result['method']) && $result['method'] === 'import') {
+                    // Show import modal with prepared data
+                    $this->importData = $result['import_data'];
+                    $this->showImportModal = true;
+                    $this->notify(['type' => 'info', 'message' => 'Sheet structure prepared! Please follow the import instructions.']);
+                } else {
+                    // Sheets were created successfully via API
+                    $this->notify(['type' => 'success', 'message' => $result['message']]);
                 }
                 
-                $this->notify(['type' => 'success', 'message' => 'Apps Script generated successfully! Please follow the instructions in the popup.']);
+                EcommerceLogger::info('One-click sheet creation completed', [
+                    'tenant_id' => tenant_id(),
+                    'method' => $result['method'] ?? 'api',
+                    'created_sheets' => $result['created_sheets'] ?? []
+                ]);
             } else {
-                EcommerceLogger::error('Sheet sync failed', [
+                EcommerceLogger::error('One-click sheet creation failed', [
                     'tenant_id' => tenant_id(),
                     'error' => $result['message']
                 ]);
                 $this->notify(['type' => 'danger', 'message' => $result['message']]);
             }
         } catch (\Exception $e) {
-            EcommerceLogger::error('Sheet sync exception', [
+            EcommerceLogger::error('One-click sheet creation exception', [
                 'tenant_id' => tenant_id(),
                 'exception' => $e->getMessage(),
                 'stack_trace' => $e->getTraceAsString()
             ]);
-            $this->notify(['type' => 'danger', 'message' => 'Sheet sync failed: ' . $e->getMessage()]);
+            $this->notify(['type' => 'danger', 'message' => 'Sheet creation failed: ' . $e->getMessage()]);
         }
     }
 
@@ -239,6 +258,19 @@ class EcommerceSettings extends Component
         $this->showScriptModal = false;
         $this->generatedScript = '';
     }
+
+    public function closeImportModal()
+    {
+        $this->showImportModal = false;
+        $this->importData = [];
+    }
+
+    public function checkServiceAccountStatus()
+    {
+        $service = new GoogleSheetsServiceAccountService();
+        $this->serviceAccountStatus = $service->checkServiceAccountSetup();
+    }
+
 
     protected function getDefaultOrderMessage()
     {

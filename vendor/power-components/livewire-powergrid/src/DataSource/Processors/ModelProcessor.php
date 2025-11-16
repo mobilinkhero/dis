@@ -2,64 +2,106 @@
 
 namespace PowerComponents\LivewirePowerGrid\DataSource\Processors;
 
-use Illuminate\Pipeline\Pipeline;
-use PowerComponents\LivewirePowerGrid\DataSource\DataTransformer;
-use PowerComponents\LivewirePowerGrid\DataSource\Processors\Database\Pipelines;
-use PowerComponents\LivewirePowerGrid\DataSource\Processors\Pipelines as CommonPipelines;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorInterface;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Pagination\{LengthAwarePaginator, Paginator};
+use Illuminate\Support\Collection as BaseCollection;
+use PowerComponents\LivewirePowerGrid\DataSource\{Builder, DataSourceProcessorInterface};
+use Throwable;
 
-class ModelProcessor extends DataSourceBase
+class ModelProcessor extends DataSourceBase implements DataSourceProcessorInterface
 {
     public static function match(mixed $key): bool
     {
         return true;
     }
 
-    public function process(): array
+    /**
+     * @throws Throwable
+     */
+    public function process(): BaseCollection|LengthAwarePaginator|LengthAwarePaginatorInterface|Paginator|MorphToMany
     {
-        $datasource = $this->component->datasource($this->component->properties ?? []);
+        $this->setCurrentTable($this->prepareDataSource());
 
-        $this->setCurrentTable($datasource);
+        $results = $this->prepareDataSource()
+            ->where(
+                fn (EloquentBuilder|QueryBuilder $query) => Builder::make($query, $this->component)
+                    ->filterContains()
+                    ->filter()
+            );
 
-        $query = app(Pipeline::class)
-            ->send($datasource)
-            ->through([
-                new Pipelines\Filters($this->component),
-                new Pipelines\SoftDeletes($this->component),
-                new Pipelines\ColumnRawQueries($this->component),
-                new CommonPipelines\Summaries($this->component),
-                new Pipelines\Sorting($this->component),
-            ])
-            ->thenReturn();
-
-        $paginate = app(Pipeline::class)
-            ->send($query)
-            ->through([
-                new CommonPipelines\Pagination($this->component),
-            ])
-            ->thenReturn();
-
-        $this->setTotalCount($paginate);
-
-        /** @var \Illuminate\Support\Collection $collection */
-        $collection = $paginate->getCollection();
-
-        if (filled(data_get($this->component, 'setUp.lazy'))) {
-            $paginate->setCollection($collection);
-
-            return [
-                'results' => $paginate,
-                'transformTime' => 0,
-                'actionsByRow' => [],
-            ];
+        if ($this->prepareDataSource() instanceof EloquentBuilder || $this->prepareDataSource() instanceof MorphToMany) {
+            $results = $this->applySoftDeletes($results, $this->component->softDeletes);
         }
 
-        $dataTransformer = new DataTransformer($this->component);
-        $transformResult = $dataTransformer->transform($collection);
+        $this->applyColumnRawQueries($results);
 
-        return [
-            'results' => $paginate->setCollection($transformResult->getCollection()),
-            'transformTime' => $transformResult->getTransformTimeInMs(),
-            'actionsByRow' => $transformResult->getActionsByRow(),
-        ];
+        $this->applySummaries($results);
+
+        if (filled($this->component->sortField)) {
+            $results = $this->component->multiSort
+                ? $this->applyMultipleSort($results)
+                : $results->orderBy($this->makeSortField($this->component->sortField), $this->component->sortDirection);
+        }
+
+        $results = $this->applyPerPage($results);
+
+        $this->setTotalCount($results);
+
+        if (filled(data_get($this->component, 'setUp.lazy'))) {
+            return $results;
+        }
+
+        $collection = $results->getCollection(); // @phpstan-ignore-line
+
+        return $results->setCollection($this->transform($collection, $this->component)); // @phpstan-ignore-line
+    }
+
+    private function applyColumnRawQueries(MorphToMany|EloquentBuilder|QueryBuilder $results): void
+    {
+        collect($this->component->columns())
+            ->filter(fn ($column) => filled(data_get($column, 'rawQueries')))
+            ->map(function ($column) use ($results) {
+                foreach ((array) data_get($column, 'rawQueries', []) as $rawQuery) {
+                    /** @var array $rawQuery */
+                    $method   = $rawQuery['method'];
+                    $sql      = $rawQuery['sql'];
+                    $bindings = $rawQuery['bindings'];
+                    $enabled  = false;
+
+                    if (isset($rawQuery['enabled'])) {
+                        $enabled = $rawQuery['enabled'];
+                        $enabled = is_callable($enabled) ? $enabled($this->component) : $enabled;
+                    }
+
+                    $bindings = array_map(function ($param) {
+                        if ($param instanceof \Closure) {
+                            $param = $param($this->component);
+                        } else {
+                            $param = preg_replace_callback('/\{(\w+)\}/', function ($matches) {
+                                $property = trim($matches[1]);
+
+                                return $this->component->{$property};
+                            }, $param);
+                        }
+
+                        return $param;
+                    }, $bindings);
+
+                    $sql = preg_replace_callback('/\{(\w+)\}/', function ($matches) {
+                        $property = trim($matches[1]);
+
+                        return $this->component->{$property};
+                    }, $sql);
+
+                    if ($sql && $enabled) {
+                        $results->{$method}($sql, $bindings);
+                    }
+
+                    return $rawQuery;
+                }
+            });
     }
 }

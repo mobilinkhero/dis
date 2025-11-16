@@ -13,5 +13,4 @@ class Metadata extends BaseDTO
     public ?string $title;
     public ?string $description;
     public bool $authenticated = false;
-    public bool $deprecated = false;
 }

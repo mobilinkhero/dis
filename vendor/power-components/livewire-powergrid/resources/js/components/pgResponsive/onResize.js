@@ -20,11 +20,7 @@ function getTableUtilWidth(element) {
 function getItemsToHide(element, tableWidth) {
     const items = [].slice.call(element.querySelectorAll('table thead tr:nth-child(1) th'))
 
-    const visibleThs = Array.from(items).filter(th => {
-        return getComputedStyle(th).display !== 'none';
-    });
-
-    const itemsSorted = [].slice.call(visibleThs).sort(function (a,b) {
+    const itemsSorted = [].slice.call(items).sort(function (a,b) {
         const firstSortOrder = a.getAttribute('sort_order') ??  999
         const secondSortOrder = b.getAttribute('sort_order') ??  999
 
@@ -47,7 +43,7 @@ function getItemsToHide(element, tableWidth) {
         if (fitsMoreItems && calc <= tableWidth && (calc + itemWidth <= tableWidth)) {
             calc += itemWidth;
         } else {
-            itemsToHide.push(visibleThs.indexOf(item) + 1)
+            itemsToHide.push(items.indexOf(item) + 1)
             fitsMoreItems = false
         }
     })

@@ -40,7 +40,6 @@ return [
         // 'Chat' => [
         //     'name_lower' => 'chat',
         //     'path' => base_path('libraries/Chat'),
-        //     // 'app_path' => 'src',
         //     'module_namespace' => 'Libraries\\Chat',
         //     'namespace' => 'Livewire',
         //     'view' => 'resources/views/livewire',

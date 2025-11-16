@@ -2,81 +2,59 @@
 
 namespace PowerComponents\LivewirePowerGrid\DataSource\Processors;
 
-use Illuminate\Pagination\{LengthAwarePaginator, Paginator};
-use Illuminate\Routing\Pipeline;
+use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\{Collection, Collection as BaseCollection};
-use PowerComponents\LivewirePowerGrid\DataSource\DataTransformer;
-use PowerComponents\LivewirePowerGrid\DataSource\Processors\Collection\Pipelines;
-use PowerComponents\LivewirePowerGrid\DataSource\Processors\Pipelines as CommonPipelines;
+use PowerComponents\LivewirePowerGrid\DataSource\{Collection as DataSourceCollection, DataSourceProcessorInterface};
 
-class CollectionProcessor extends DataSourceBase
+class CollectionProcessor extends DataSourceBase implements DataSourceProcessorInterface
 {
     public static function match(mixed $key): bool
     {
         return $key instanceof Collection;
     }
 
-    public function process(): array
+    /**
+     * @throws BindingResolutionException
+     */
+    public function process(): LengthAwarePaginator|BaseCollection
     {
-        $datasource = $this->component->datasource($this->component->properties ?? []);
+        $results = DataSourceCollection::make(
+            new BaseCollection($this->prepareDataSource()), // @phpstan-ignore-line
+            $this->component
+        )
+            ->filterContains()
+            ->filter();
 
-        $collection = new BaseCollection($datasource);
+        if (filled($this->component->sortField)) {
+            if ($this->component->multiSort) {
+                $formattedSortingArray = [];
 
-        /** @var BaseCollection $results */
-        $results = app(Pipeline::class)
-            ->send($collection)
-            ->through([
-                new Pipelines\GlobalSearch($this->component),
-                new Pipelines\Filters($this->component),
-                new Pipelines\Sorting($this->component),
-                new CommonPipelines\Summaries($this->component),
-            ])
-            ->thenReturn();
+                foreach ($this->component->sortArray as $sortField => $sortDirection) {
+                    $formattedSortingArray[] = [$sortField, $sortDirection];
+                }
+
+                $results = $results->sortBy($formattedSortingArray);
+            } else {
+                $results = $results->sortBy($this->component->sortField, SORT_REGULAR, !(($this->component->sortDirection === 'asc')));
+            }
+        }
+
+        $this->applySummaries($results);
 
         $this->component->total = $results->count();
 
-        $paginated = $results;
-        $dataTransformer = new DataTransformer($this->component);
-        $actionsByRow = [];
-        $timeInMs = 0;
-
-        if ($results->count() > 0) {
+        if ($results->count()) {
             $this->component->filtered = $results->pluck($this->component->primaryKey)->toArray();
-            $paginated = $this->paginate($results);
 
-            $transformResult = $dataTransformer->transform($paginated->getCollection());
-            $actionsByRow = $transformResult->getActionsByRow();
-            $timeInMs = $transformResult->getTransformTimeInMs();
+            $perPage   = $this->isExport ? $this->component->total : intval(data_get($this->component->setUp, 'footer.perPage'));
+            $paginated = DataSourceCollection::paginate($results, $perPage);
 
-            $paginated->setCollection($transformResult->getCollection());
+            $results = $paginated->setCollection(
+                $this->transform($paginated->getCollection(), $this->component)
+            );
         }
 
-        return [
-            'results' => $paginated,
-            'transformTime' => $timeInMs,
-            'actionsByRow' => $actionsByRow,
-        ];
-    }
-
-    private function paginate(BaseCollection $results): LengthAwarePaginator
-    {
-        $perPage = $this->isExport
-            ? $results->count()
-            : intval(data_get($this->component->setUp, 'footer.perPage', 10));
-
-        $perPage = $perPage > 0 ? $perPage : $results->count();
-
-        $page = Paginator::resolveCurrentPage('page');
-
-        return new LengthAwarePaginator(
-            items: $results->forPage($page, $perPage),
-            total: $results->count(),
-            perPage: $perPage,
-            currentPage: $page,
-            options: [
-                'path' => Paginator::resolveCurrentPath(),
-                'pageName' => 'page',
-            ]
-        );
+        return $results;
     }
 }
