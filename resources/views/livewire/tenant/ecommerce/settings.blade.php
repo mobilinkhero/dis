@@ -60,6 +60,30 @@
                     @error('settings.tax_rate') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                 </div>
 
+                <!-- Google Sheets Connection -->
+                <div>
+                    <label for="google_sheets_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Google Sheets Connection
+                    </label>
+                    <div class="relative">
+                        <input type="url" 
+                               wire:model="settings.google_sheets_url" 
+                               class="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                               placeholder="https://docs.google.com/spreadsheets/d/...">
+                        
+                        @if(!empty($config->google_sheets_url))
+                            <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                                <div class="flex items-center">
+                                    <div class="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                                    <span class="text-xs text-green-600 dark:text-green-400">Connected</span>
+                                </div>
+                            </div>
+                        @endif
+                        
+                        @error('settings.google_sheets_url') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                    </div>
+                </div>
+
                 <!-- Payment Methods -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -297,15 +321,29 @@
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
         
         <div class="flex gap-3 flex-wrap mb-4">
-            <button wire:click="syncSheets" 
-                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                ⚡ One-Click Create Sheets
-            </button>
-            
-            <button wire:click="syncWithGoogleSheets" 
-                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                🔄 Sync Data with Sheets
-            </button>
+            @if(!empty($config->google_sheets_url))
+                <button wire:click="syncSheets" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    ⚡ One-Click Create Sheets
+                </button>
+                
+                <button wire:click="syncWithGoogleSheets" 
+                        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                    🔄 Sync Data with Sheets
+                </button>
+
+                <button wire:click="disconnectGoogleSheets" 
+                        wire:confirm="Are you sure you want to disconnect Google Sheets? This will remove all connection data."
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                    🔌 Disconnect Sheets
+                </button>
+            @else
+                <div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <p class="text-yellow-800 dark:text-yellow-200 text-sm">
+                        📋 <strong>Google Sheets URL required:</strong> Please enter your Google Sheets URL in the configuration above to enable sheet integration.
+                    </p>
+                </div>
+            @endif
             
             <a href="{{ tenant_route('tenant.ecommerce.dashboard') }}" 
                class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">

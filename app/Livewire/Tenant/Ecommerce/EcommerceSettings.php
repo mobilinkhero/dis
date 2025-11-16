@@ -271,6 +271,59 @@ class EcommerceSettings extends Component
         $this->serviceAccountStatus = $service->checkServiceAccountSetup();
     }
 
+    public function disconnectGoogleSheets()
+    {
+        try {
+            if (!$this->config) {
+                $this->notify(['type' => 'danger', 'message' => 'No e-commerce configuration found']);
+                return;
+            }
+
+            EcommerceLogger::info('Google Sheets disconnection initiated', [
+                'tenant_id' => tenant_id(),
+                'user_id' => auth()->id(),
+                'previous_url' => $this->config->google_sheets_url
+            ]);
+
+            // Clear Google Sheets configuration
+            $this->config->update([
+                'google_sheets_url' => null,
+                'google_sheets_enabled' => false,
+                'last_sync_at' => null
+            ]);
+
+            // Update local settings
+            $this->settings['google_sheets_url'] = '';
+            $this->settings['google_sheets_enabled'] = false;
+
+            EcommerceLogger::info('Google Sheets disconnected successfully', [
+                'tenant_id' => tenant_id(),
+                'user_id' => auth()->id()
+            ]);
+
+            $this->notify([
+                'type' => 'success', 
+                'message' => 'Google Sheets disconnected successfully! All sheet connection data has been removed.'
+            ]);
+
+            // Refresh the component
+            $this->loadSettings();
+
+        } catch (\Exception $e) {
+            EcommerceLogger::error('Google Sheets disconnection failed', [
+                'tenant_id' => tenant_id(),
+                'user_id' => auth()->id(),
+                'exception' => $e->getMessage(),
+                'stack_trace' => $e->getTraceAsString()
+            ]);
+
+            $this->notify([
+                'type' => 'danger', 
+                'message' => 'Failed to disconnect Google Sheets: ' . $e->getMessage()
+            ]);
+        }
+    }
+
 
     protected function getDefaultOrderMessage()
     {
