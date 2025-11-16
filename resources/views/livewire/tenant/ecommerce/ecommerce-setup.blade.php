@@ -411,10 +411,23 @@
                     </svg>
                 </div>
                 
-                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">🎉 Setup Complete!</h2>
-                <p class="text-gray-600 dark:text-gray-400 mb-6">
-                    Your e-commerce bot is now configured and ready to use. You can start syncing products and taking orders via WhatsApp.
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">🎉 E-commerce Bot Active!</h2>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">
+                    Your e-commerce bot is configured and ready. Manage your products and orders below.
                 </p>
+
+                {{-- Configuration Summary --}}
+                @if($ecommerceBot)
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6 text-left">
+                        <h3 class="font-medium text-gray-900 dark:text-white mb-2">Current Configuration:</h3>
+                        <div class="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                            <div>✅ Bot Status: {{ $ecommerceBot->is_enabled ? 'Enabled' : 'Disabled' }}</div>
+                            <div>📊 Product Sheet: {{ $ecommerceBot->google_sheets_product_url ? 'Connected' : 'Not Connected' }}</div>
+                            <div>📋 Order Sheet: {{ $ecommerceBot->google_sheets_order_url ? 'Connected' : 'Optional' }}</div>
+                            <div>🔄 Last Sync: {{ $ecommerceBot->last_sync_at ? $ecommerceBot->last_sync_at->diffForHumans() : 'Never' }}</div>
+                        </div>
+                    </div>
+                @endif
 
                 <div class="space-y-4 max-w-md mx-auto">
                     <button 
@@ -457,6 +470,14 @@
                     >
                         🔧 Create Sales Flows
                     </a>
+
+                    <button 
+                        type="button"
+                        wire:click="reconfigure"
+                        class="block w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium text-center transition-colors"
+                    >
+                        ⚙️ Reconfigure Settings
+                    </button>
                 </div>
 
                 {{-- Quick Stats --}}

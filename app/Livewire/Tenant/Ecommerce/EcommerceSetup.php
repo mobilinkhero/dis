@@ -54,6 +54,12 @@ class EcommerceSetup extends Component
             $this->productSheetsUrl = $this->ecommerceBot->google_sheets_product_url ?? '';
             $this->orderSheetsUrl = $this->ecommerceBot->google_sheets_order_url ?? '';
             $this->syncSettings = $this->ecommerceBot->sync_settings ?? $this->getDefaultSyncSettings();
+            
+            // If bot is already configured and enabled, show completed state
+            if ($this->ecommerceBot->is_enabled && $this->ecommerceBot->google_sheets_product_url) {
+                $this->currentStep = 'complete';
+                $this->notify(['type' => 'info', 'message' => 'E-commerce bot is already configured and active!']);
+            }
         } else {
             $this->syncSettings = $this->getDefaultSyncSettings();
         }
@@ -234,6 +240,12 @@ class EcommerceSetup extends Component
 
         $this->currentStep = $step;
         $this->notify(['type' => 'info', 'message' => 'Moved to step: ' . ucfirst($step)]);
+    }
+
+    public function reconfigure()
+    {
+        $this->currentStep = 'setup';
+        $this->notify(['type' => 'info', 'message' => 'You can now reconfigure your e-commerce bot settings']);
     }
 
     private function getDefaultSyncSettings(): array
