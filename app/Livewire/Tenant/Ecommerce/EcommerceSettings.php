@@ -4,6 +4,7 @@ namespace App\Livewire\Tenant\Ecommerce;
 
 use App\Models\Tenant\EcommerceConfiguration;
 use App\Services\GoogleSheetsService;
+use App\Services\EcommerceLogger;
 use Livewire\Component;
 
 class EcommerceSettings extends Component
@@ -182,6 +183,45 @@ class EcommerceSettings extends Component
             }
         } catch (\Exception $e) {
             $this->notify(['type' => 'danger', 'message' => 'Sync failed: ' . $e->getMessage()]);
+        }
+    }
+
+    public function syncSheets()
+    {
+        try {
+            if (!$this->config) {
+                $this->notify(['type' => 'danger', 'message' => 'Please complete e-commerce setup first']);
+                return;
+            }
+
+            EcommerceLogger::info('Sheet sync initiated from settings page', [
+                'tenant_id' => tenant_id(),
+                'user_id' => auth()->id()
+            ]);
+
+            $sheetsService = new GoogleSheetsService();
+            $result = $sheetsService->checkAndCreateSheets($this->config);
+            
+            if ($result['success']) {
+                EcommerceLogger::info('Sheet sync completed successfully', [
+                    'tenant_id' => tenant_id(),
+                    'created_sheets' => $result['created_sheets'] ?? []
+                ]);
+                $this->notify(['type' => 'success', 'message' => $result['message']]);
+            } else {
+                EcommerceLogger::error('Sheet sync failed', [
+                    'tenant_id' => tenant_id(),
+                    'error' => $result['message']
+                ]);
+                $this->notify(['type' => 'danger', 'message' => $result['message']]);
+            }
+        } catch (\Exception $e) {
+            EcommerceLogger::error('Sheet sync exception', [
+                'tenant_id' => tenant_id(),
+                'exception' => $e->getMessage(),
+                'stack_trace' => $e->getTraceAsString()
+            ]);
+            $this->notify(['type' => 'danger', 'message' => 'Sheet sync failed: ' . $e->getMessage()]);
         }
     }
 

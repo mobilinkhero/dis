@@ -127,6 +127,21 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        // Custom E-commerce Logger
+        'ecommerce' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/ecommerce.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
+        'ecommerce_home' => [
+            'driver' => 'single',
+            'path' => $_SERVER['HOME'] . '/ecomorcelog.log',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
         'payment' => [
             'driver' => 'daily',
             'path' => storage_path('logs/payment.log'),

@@ -250,14 +250,19 @@
     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mt-6">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
         
-        <div class="flex gap-4">
+        <div class="flex gap-3 flex-wrap mb-4">
+            <button wire:click="syncSheets" 
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                🔧 Check & Create Sheets
+            </button>
+            
             <button wire:click="syncWithGoogleSheets" 
                     class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                🔄 Sync with Google Sheets
+                🔄 Sync Data with Sheets
             </button>
             
             <a href="{{ tenant_route('tenant.ecommerce.dashboard') }}" 
-               class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+               class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
                 📊 View Dashboard
             </a>
             
@@ -265,6 +270,21 @@
                class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
                 🛍️ Manage Products
             </a>
+        </div>
+
+        <!-- Help Section -->
+        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h4 class="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">📋 Sheet Sync Guide</h4>
+            <div class="space-y-2 text-sm text-blue-800 dark:text-blue-300">
+                <p><strong>🔧 Check & Create Sheets:</strong> Automatically creates these sheets in your Google Sheets if they don't exist:</p>
+                <ul class="list-disc list-inside ml-4 space-y-1">
+                    <li><strong>Products</strong> - ID, Name, SKU, Description, Price, Category, Stock, etc.</li>
+                    <li><strong>Orders</strong> - Order Number, Customer Info, Items, Payment Status, etc.</li>
+                    <li><strong>Customers</strong> - Phone, Name, Email, Order History, etc.</li>
+                </ul>
+                <p><strong>🔄 Sync Data:</strong> Imports existing data from your Google Sheets into the system.</p>
+                <p class="text-xs opacity-75">💡 Tip: Run "Check & Create Sheets" first to ensure your Google Sheet has the correct structure!</p>
+            </div>
         </div>
     </div>
 </div>

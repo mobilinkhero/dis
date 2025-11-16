@@ -6,6 +6,7 @@ use App\Models\Tenant\EcommerceConfiguration;
 use App\Models\Tenant\Product;
 use App\Models\Tenant\Order;
 use App\Services\GoogleSheetsService;
+use App\Services\EcommerceLogger;
 use Livewire\Component;
 
 class EcommerceDashboard extends Component
@@ -69,21 +70,37 @@ class EcommerceDashboard extends Component
     public function syncNow()
     {
         if (!$this->isConfigured) {
+            EcommerceLogger::warning('Sync attempted without configuration', [
+                'tenant_id' => tenant_id(),
+                'config_exists' => !is_null($this->config)
+            ]);
             $this->notify(['type' => 'danger', 'message' => 'E-commerce not configured yet']);
             return;
         }
 
         try {
+            EcommerceLogger::info('Manual sync started from dashboard', [
+                'tenant_id' => tenant_id(),
+                'user_id' => auth()->id()
+            ]);
+
             $sheetsService = new GoogleSheetsService();
-            $result = $sheetsService->syncProductsFromSheets();
+            $result = $sheetsService->syncProducts($this->config);
             
             if ($result['success']) {
+                EcommerceLogger::sheetsSync('manual_products', 'success', $result);
                 $this->notify(['type' => 'success', 'message' => $result['message']]);
                 $this->loadStats(); // Refresh stats
             } else {
+                EcommerceLogger::sheetsSync('manual_products', 'failed', $result);
                 $this->notify(['type' => 'danger', 'message' => $result['message']]);
             }
         } catch (\Exception $e) {
+            EcommerceLogger::error('Manual sync failed', [
+                'tenant_id' => tenant_id(),
+                'exception' => $e->getMessage(),
+                'stack_trace' => $e->getTraceAsString()
+            ]);
             $this->notify(['type' => 'danger', 'message' => 'Sync failed: ' . $e->getMessage()]);
         }
     }

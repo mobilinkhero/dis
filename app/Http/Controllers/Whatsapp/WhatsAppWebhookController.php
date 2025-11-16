@@ -15,6 +15,7 @@ use App\Models\Tenant\WhatsappTemplate;
 use App\Services\FeatureService;
 use App\Services\pusher\PusherService;
 use App\Services\EcommerceOrderService;
+use App\Services\EcommerceLogger;
 use App\Traits\WhatsApp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -239,34 +240,64 @@ class WhatsAppWebhookController extends Controller
                     }
 
                     if (! $this->is_bot_stop) {
-                        // First, try to handle e-commerce interactions
-                        $ecommerceService = new EcommerceOrderService($this->tenant_id);
-                        $ecommerceResult = $ecommerceService->processMessage($trigger_msg, $contact_data);
-                        
-                        if ($ecommerceResult['handled'] && $ecommerceResult['response']) {
-                            // Send e-commerce response
-                            $ecommerceMessage = [
-                                'type' => 'text',
-                                'message' => $ecommerceResult['response'],
-                                'rel_id' => $contact_data->id,
-                            ];
+                        try {
+                            // First, try to handle e-commerce interactions
+                            EcommerceLogger::info('Processing WhatsApp message for e-commerce', [
+                                'tenant_id' => $this->tenant_id,
+                                'phone' => $contact_number,
+                                'message' => $trigger_msg
+                            ]);
+
+                            $ecommerceService = new EcommerceOrderService($this->tenant_id);
+                            $ecommerceResult = $ecommerceService->processMessage($trigger_msg, $contact_data);
                             
-                            $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $ecommerceMessage, $metadata['phone_number_id']);
-                            
-                            $chatId = $this->createOrUpdateInteraction(
-                                $contact_number, 
-                                $message_data['metadata']['display_phone_number'], 
-                                $message_data['metadata']['phone_number_id'], 
-                                $contact_data->firstname.' '.$contact_data->lastname, 
-                                '', 
-                                '', 
-                                false
-                            );
-                            
-                            $this->storeBotMessages($ecommerceMessage, $chatId, $contact_data, 'ecommerce_bot', $response);
-                            
-                            // Exit early if e-commerce handled the message
-                            return;
+                            if ($ecommerceResult['handled'] && $ecommerceResult['response']) {
+                                EcommerceLogger::botInteraction(
+                                    $contact_number, 
+                                    $trigger_msg, 
+                                    $ecommerceResult['response'],
+                                    ['source' => 'WhatsApp Webhook']
+                                );
+
+                                // Send e-commerce response
+                                $ecommerceMessage = [
+                                    'type' => 'text',
+                                    'message' => $ecommerceResult['response'],
+                                    'rel_id' => $contact_data->id,
+                                ];
+                                
+                                $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $ecommerceMessage, $metadata['phone_number_id']);
+                                
+                                $chatId = $this->createOrUpdateInteraction(
+                                    $contact_number, 
+                                    $message_data['metadata']['display_phone_number'], 
+                                    $message_data['metadata']['phone_number_id'], 
+                                    $contact_data->firstname.' '.$contact_data->lastname, 
+                                    '', 
+                                    '', 
+                                    false
+                                );
+                                
+                                $this->storeBotMessages($ecommerceMessage, $chatId, $contact_data, 'ecommerce_bot', $response);
+                                
+                                EcommerceLogger::info('E-commerce response sent successfully', [
+                                    'tenant_id' => $this->tenant_id,
+                                    'phone' => $contact_number,
+                                    'response_sent' => true
+                                ]);
+                                
+                                // Exit early if e-commerce handled the message
+                                return;
+                            }
+                        } catch (\Exception $e) {
+                            EcommerceLogger::error('E-commerce WhatsApp processing failed', [
+                                'tenant_id' => $this->tenant_id,
+                                'phone' => $contact_number,
+                                'message' => $trigger_msg,
+                                'exception' => $e->getMessage(),
+                                'stack_trace' => $e->getTraceAsString()
+                            ]);
+                            // Continue with normal bot processing on e-commerce error
                         }
                         
                         // Fetch template and message bots based on interaction

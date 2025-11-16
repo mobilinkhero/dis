@@ -6,6 +6,7 @@ use App\Models\Tenant\Product;
 use App\Models\Tenant\Order;
 use App\Models\Tenant\Contact;
 use App\Models\Tenant\EcommerceConfiguration;
+use App\Services\EcommerceLogger;
 use App\Traits\Ai;
 use App\Traits\WhatsApp;
 use Carbon\Carbon;
@@ -34,43 +35,70 @@ class EcommerceOrderService
      */
     public function processMessage(string $message, Contact $contact): array
     {
-        $this->currentContact = $contact;
-        
-        // Check if e-commerce is configured
-        if (!$this->config || !$this->config->isFullyConfigured()) {
+        try {
+            EcommerceLogger::botInteraction(
+                $contact->phone ?? 'unknown', 
+                $message, 
+                'Processing started',
+                ['method' => 'processMessage']
+            );
+
+            // Check if e-commerce is configured
+            if (!$this->config || !$this->config->isFullyConfigured()) {
+                EcommerceLogger::warning('E-commerce not configured for tenant', [
+                    'tenant_id' => $this->tenantId,
+                    'config_exists' => !is_null($this->config)
+                ]);
+                
+                return [
+                    'handled' => false,
+                    'response' => null
+                ];
+            }
+
+            $this->currentContact = $contact;
+            
+            // Use AI to detect intent and extract product information
+            $intent = $this->detectMessageIntent($message);
+            
+            switch ($intent['type']) {
+                case 'browse_products':
+                    return $this->handleBrowseProducts($intent);
+                
+                case 'product_inquiry':
+                    return $this->handleProductInquiry($intent);
+                
+                case 'add_to_cart':
+                    return $this->handleAddToCart($intent);
+                
+                case 'view_cart':
+                    return $this->handleViewCart();
+                
+                case 'checkout':
+                    return $this->handleCheckout($intent);
+                
+                case 'order_status':
+                    return $this->handleOrderStatus($intent);
+                
+                case 'help':
+                    return $this->handleHelp();
+                
+                default:
+                    return $this->handleUnknownMessage($message);
+            }
+        } catch (\Exception $e) {
+            EcommerceLogger::error('Error processing message', [
+                'tenant_id' => $this->tenantId,
+                'contact_phone' => $contact->phone ?? 'unknown',
+                'message' => $message,
+                'exception' => $e->getMessage(),
+                'stack_trace' => $e->getTraceAsString()
+            ]);
+
             return [
                 'handled' => false,
-                'response' => null
+                'response' => 'An error occurred while processing your message. Please try again later.'
             ];
-        }
-
-        // Use AI to detect intent and extract product information
-        $intent = $this->detectMessageIntent($message);
-        
-        switch ($intent['type']) {
-            case 'browse_products':
-                return $this->handleBrowseProducts($intent);
-            
-            case 'product_inquiry':
-                return $this->handleProductInquiry($intent);
-            
-            case 'add_to_cart':
-                return $this->handleAddToCart($intent);
-            
-            case 'view_cart':
-                return $this->handleViewCart();
-            
-            case 'checkout':
-                return $this->handleCheckout($intent);
-            
-            case 'order_status':
-                return $this->handleOrderStatus($intent);
-            
-            case 'help':
-                return $this->handleHelp();
-            
-            default:
-                return $this->handleUnknownMessage($message);
         }
     }
 
