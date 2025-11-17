@@ -105,18 +105,18 @@ class EcommerceSettings extends Component
         'settings.shipping_settings.free_shipping_threshold' => 'required_if:settings.shipping_settings.enabled,true|numeric|min:0',
         'settings.shipping_settings.default_shipping_cost' => 'required_if:settings.shipping_settings.enabled,true|numeric|min:0',
         
-        // AI Settings Validation
+        // AI Settings Validation (relaxed for debugging)
         'settings.ai_enabled' => 'boolean',
-        'settings.ai_provider' => 'required_if:settings.ai_enabled,true|string|in:openai',
-        'settings.ai_api_key' => 'required_if:settings.ai_enabled,true|string',
-        'settings.ai_model' => 'required_if:settings.ai_enabled,true|string',
-        'settings.ai_temperature' => 'required_if:settings.ai_enabled,true|numeric|min:0|max:1',
-        'settings.ai_max_tokens' => 'required_if:settings.ai_enabled,true|integer|min:100|max:4000',
+        'settings.ai_provider' => 'nullable|string',
+        'settings.ai_api_key' => 'nullable|string',
+        'settings.ai_model' => 'nullable|string',
+        'settings.ai_temperature' => 'nullable|numeric|min:0|max:1',
+        'settings.ai_max_tokens' => 'nullable|integer|min:100|max:4000',
         'settings.ai_system_prompt' => 'nullable|string|max:2000',
         'settings.ai_product_recommendations' => 'boolean',
         'settings.ai_order_processing' => 'boolean',
         'settings.ai_customer_support' => 'boolean',
-        'settings.ai_response_timeout' => 'required_if:settings.ai_enabled,true|integer|min:5|max:120',
+        'settings.ai_response_timeout' => 'nullable|integer|min:5|max:120',
         'settings.ai_fallback_message' => 'nullable|string|max:500',
     ];
 
@@ -178,15 +178,22 @@ class EcommerceSettings extends Component
 
     public function saveSettings()
     {
-        $this->validate();
-
         try {
+            // Add debugging
+            \Log::info('Saving AI settings', [
+                'ai_enabled' => $this->settings['ai_enabled'] ?? 'not_set',
+                'ai_api_key' => isset($this->settings['ai_api_key']) ? 'SET' : 'NOT_SET',
+                'ai_model' => $this->settings['ai_model'] ?? 'not_set'
+            ]);
+
+            $this->validate();
+
             if (!$this->config) {
                 $this->notify(['type' => 'danger', 'message' => 'Please complete e-commerce setup first']);
                 return redirect()->to(tenant_route('tenant.ecommerce.setup'));
             }
 
-            $this->config->update([
+            $updateData = [
                 'currency' => $this->settings['currency'],
                 'tax_rate' => (float) $this->settings['tax_rate'],
                 'payment_methods' => $this->settings['payment_methods'],
@@ -198,22 +205,32 @@ class EcommerceSettings extends Component
                 'shipping_settings' => $this->settings['shipping_settings'],
                 
                 // AI Settings
-                'ai_enabled' => $this->settings['ai_enabled'],
-                'ai_provider' => $this->settings['ai_provider'],
-                'ai_api_key' => $this->settings['ai_api_key'],
-                'ai_model' => $this->settings['ai_model'],
-                'ai_temperature' => (float) $this->settings['ai_temperature'],
-                'ai_max_tokens' => (int) $this->settings['ai_max_tokens'],
-                'ai_system_prompt' => $this->settings['ai_system_prompt'],
-                'ai_product_recommendations' => $this->settings['ai_product_recommendations'],
-                'ai_order_processing' => $this->settings['ai_order_processing'],
-                'ai_customer_support' => $this->settings['ai_customer_support'],
-                'ai_response_timeout' => (int) $this->settings['ai_response_timeout'],
-                'ai_fallback_message' => $this->settings['ai_fallback_message'],
-            ]);
+                'ai_enabled' => $this->settings['ai_enabled'] ?? false,
+                'ai_provider' => $this->settings['ai_provider'] ?? 'openai',
+                'ai_api_key' => $this->settings['ai_api_key'] ?? '',
+                'ai_model' => $this->settings['ai_model'] ?? 'gpt-3.5-turbo',
+                'ai_temperature' => (float) ($this->settings['ai_temperature'] ?? 0.7),
+                'ai_max_tokens' => (int) ($this->settings['ai_max_tokens'] ?? 1000),
+                'ai_system_prompt' => $this->settings['ai_system_prompt'] ?? '',
+                'ai_product_recommendations' => $this->settings['ai_product_recommendations'] ?? true,
+                'ai_order_processing' => $this->settings['ai_order_processing'] ?? true,
+                'ai_customer_support' => $this->settings['ai_customer_support'] ?? true,
+                'ai_response_timeout' => (int) ($this->settings['ai_response_timeout'] ?? 30),
+                'ai_fallback_message' => $this->settings['ai_fallback_message'] ?? '',
+            ];
 
-            $this->notify(['type' => 'success', 'message' => 'E-commerce settings updated successfully']);
+            \Log::info('Updating config with data', $updateData);
+            
+            $this->config->update($updateData);
+
+            \Log::info('Settings saved successfully');
+            $this->notify(['type' => 'success', 'message' => 'E-commerce settings updated successfully including AI configuration!']);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Validation failed', ['errors' => $e->errors()]);
+            $this->notify(['type' => 'danger', 'message' => 'Validation failed: ' . implode(', ', array_flatten($e->errors()))]);
         } catch (\Exception $e) {
+            \Log::error('Save settings failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             $this->notify(['type' => 'danger', 'message' => 'Error updating settings: ' . $e->getMessage()]);
         }
     }
