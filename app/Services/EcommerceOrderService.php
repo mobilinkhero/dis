@@ -64,12 +64,47 @@ class EcommerceOrderService
 
             $this->currentContact = $contact;
             
-            // Check if this is a button click
+            // Check if this is a button click - handle these manually for specific actions
             if (preg_match('/^(buy|add_cart|more_info)_(\d+)$/', $message, $matches)) {
                 return $this->handleButtonClick($matches[1], $matches[2]);
             }
             
-            // Detect intent using AI or fallback
+            // **NEW: Try AI first if enabled**
+            $aiService = new \App\Services\EcommerceAiService($this->tenantId);
+            if ($aiService->isAiEnabled()) {
+                EcommerceLogger::info('Processing message with AI', [
+                    'tenant_id' => $this->tenantId,
+                    'ai_model' => $this->config->ai_model ?? 'default'
+                ]);
+                
+                $aiResult = $aiService->processMessage($message, $contact);
+                
+                if ($aiResult['handled']) {
+                    // Process any AI-requested actions
+                    if (!empty($aiResult['actions'])) {
+                        foreach ($aiResult['actions'] as $action) {
+                            $this->processAiAction($action, $contact);
+                        }
+                    }
+                    
+                    EcommerceLogger::info('AI handled message successfully', [
+                        'tenant_id' => $this->tenantId,
+                        'has_buttons' => !empty($aiResult['buttons'])
+                    ]);
+                    
+                    return $aiResult;
+                }
+                
+                EcommerceLogger::info('AI could not handle message, falling back to manual', [
+                    'tenant_id' => $this->tenantId
+                ]);
+            } else {
+                EcommerceLogger::info('AI not enabled, using manual processing', [
+                    'tenant_id' => $this->tenantId
+                ]);
+            }
+            
+            // Fallback to manual processing
             $intent = $this->detectMessageIntent($message);
             
             // Handle based on intent
@@ -825,6 +860,111 @@ Don't make up specific products or prices. Focus on being helpful and guiding th
         }
 
         return $recommendations->toArray();
+    }
+
+    /**
+     * Process AI-requested actions
+     */
+    protected function processAiAction(array $action, Contact $contact): void
+    {
+        try {
+            switch ($action['type']) {
+                case 'create_order':
+                    $this->createAiOrder($action, $contact);
+                    break;
+                    
+                case 'add_to_cart':
+                    $this->addAiToCart($action, $contact);
+                    break;
+                    
+                case 'update_inventory':
+                    $this->updateAiInventory($action);
+                    break;
+                    
+                default:
+                    EcommerceLogger::warning('Unknown AI action type', [
+                        'action' => $action,
+                        'tenant_id' => $this->tenantId
+                    ]);
+            }
+        } catch (\Exception $e) {
+            EcommerceLogger::error('Failed to process AI action', [
+                'action' => $action,
+                'error' => $e->getMessage(),
+                'tenant_id' => $this->tenantId
+            ]);
+        }
+    }
+
+    /**
+     * Create order from AI request
+     */
+    protected function createAiOrder(array $action, Contact $contact): void
+    {
+        $product = Product::where('tenant_id', $this->tenantId)
+            ->where('id', $action['product_id'])
+            ->first();
+            
+        if (!$product) {
+            return;
+        }
+
+        $order = $this->getCurrentOrder();
+        
+        // Check if item already exists in cart
+        $existingItem = $order->items()->where('product_id', $product->id)->first();
+        
+        if ($existingItem) {
+            $existingItem->update([
+                'quantity' => $existingItem->quantity + $action['quantity'],
+                'total_price' => ($existingItem->quantity + $action['quantity']) * $product->sale_price
+            ]);
+        } else {
+            $order->items()->create([
+                'product_id' => $product->id,
+                'quantity' => $action['quantity'],
+                'unit_price' => $product->sale_price,
+                'total_price' => $action['quantity'] * $product->sale_price
+            ]);
+        }
+
+        $order->updateTotals();
+        
+        EcommerceLogger::info('AI created order item', [
+            'product_id' => $product->id,
+            'quantity' => $action['quantity'],
+            'order_id' => $order->id,
+            'tenant_id' => $this->tenantId
+        ]);
+    }
+
+    /**
+     * Add to cart from AI request
+     */
+    protected function addAiToCart(array $action, Contact $contact): void
+    {
+        $this->createAiOrder($action, $contact);
+    }
+
+    /**
+     * Update inventory from AI request
+     */
+    protected function updateAiInventory(array $action): void
+    {
+        $product = Product::where('tenant_id', $this->tenantId)
+            ->where('id', $action['product_id'])
+            ->first();
+            
+        if ($product && isset($action['stock_change'])) {
+            $product->increment('stock_quantity', $action['stock_change']);
+            
+            EcommerceLogger::info('AI updated inventory', [
+                'product_id' => $product->id,
+                'stock_change' => $action['stock_change'],
+                'new_stock' => $product->stock_quantity,
+                'tenant_id' => $this->tenantId
+            ]);
+        }
     }
 
     /**
