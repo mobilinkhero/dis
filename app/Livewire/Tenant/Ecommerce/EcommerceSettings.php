@@ -84,26 +84,32 @@ class EcommerceSettings extends Component
     protected $rules = [
         'settings.currency' => 'required|string|in:USD,EUR,GBP,INR,JPY,AUD,CAD',
         'settings.tax_rate' => 'required|numeric|min:0|max:100',
-        'settings.collect_customer_details' => 'boolean',
-        'settings.enabled_payment_methods.cod' => 'boolean',
-        'settings.enabled_payment_methods.bank_transfer' => 'boolean',
-        'settings.enabled_payment_methods.card' => 'boolean',
-        'settings.enabled_payment_methods.online' => 'boolean',
+        'settings.collect_customer_details' => 'nullable|boolean',
+        'settings.required_customer_fields.name' => 'nullable|boolean',
+        'settings.required_customer_fields.phone' => 'nullable|boolean',
+        'settings.required_customer_fields.address' => 'nullable|boolean',
+        'settings.required_customer_fields.city' => 'nullable|boolean',
+        'settings.required_customer_fields.email' => 'nullable|boolean',
+        'settings.required_customer_fields.notes' => 'nullable|boolean',
+        'settings.enabled_payment_methods.cod' => 'nullable|boolean',
+        'settings.enabled_payment_methods.bank_transfer' => 'nullable|boolean',
+        'settings.enabled_payment_methods.card' => 'nullable|boolean',
+        'settings.enabled_payment_methods.online' => 'nullable|boolean',
         'settings.payment_method_responses.cod' => 'nullable|string|max:500',
         'settings.payment_method_responses.bank_transfer' => 'nullable|string|max:500',
         'settings.payment_method_responses.card' => 'nullable|string|max:500',
         'settings.payment_method_responses.online' => 'nullable|string|max:500',
         'settings.order_confirmation_message' => 'nullable|string|max:1000',
         'settings.payment_confirmation_message' => 'nullable|string|max:1000',
-        'settings.ai_recommendations_enabled' => 'boolean',
-        'settings.abandoned_cart_settings.enabled' => 'boolean',
-        'settings.abandoned_cart_settings.delay_hours' => 'required_if:settings.abandoned_cart_settings.enabled,true|integer|min:1|max:168',
-        'settings.abandoned_cart_settings.message' => 'required_if:settings.abandoned_cart_settings.enabled,true|string|max:1000',
-        'settings.upselling_settings.enabled' => 'boolean',
-        'settings.upselling_settings.threshold_amount' => 'required_if:settings.upselling_settings.enabled,true|numeric|min:0',
-        'settings.shipping_settings.enabled' => 'boolean',
-        'settings.shipping_settings.free_shipping_threshold' => 'required_if:settings.shipping_settings.enabled,true|numeric|min:0',
-        'settings.shipping_settings.default_shipping_cost' => 'required_if:settings.shipping_settings.enabled,true|numeric|min:0',
+        'settings.ai_recommendations_enabled' => 'nullable|boolean',
+        'settings.abandoned_cart_settings.enabled' => 'nullable|boolean',
+        'settings.abandoned_cart_settings.delay_hours' => 'nullable|integer|min:1|max:168',
+        'settings.abandoned_cart_settings.message' => 'nullable|string|max:1000',
+        'settings.upselling_settings.enabled' => 'nullable|boolean',
+        'settings.upselling_settings.threshold_amount' => 'nullable|numeric|min:0',
+        'settings.shipping_settings.enabled' => 'nullable|boolean',
+        'settings.shipping_settings.free_shipping_threshold' => 'nullable|numeric|min:0',
+        'settings.shipping_settings.default_shipping_cost' => 'nullable|numeric|min:0',
     ];
 
     public function mount()
@@ -151,6 +157,43 @@ class EcommerceSettings extends Component
         }
     }
 
+    protected function ensureDefaultSettings()
+    {
+        // Ensure all required fields have default values
+        if (!isset($this->settings['collect_customer_details'])) {
+            $this->settings['collect_customer_details'] = true;
+        }
+        
+        if (!isset($this->settings['required_customer_fields'])) {
+            $this->settings['required_customer_fields'] = [
+                'name' => true,
+                'phone' => true,
+                'address' => true,
+                'city' => false,
+                'email' => false,
+                'notes' => false
+            ];
+        }
+        
+        if (!isset($this->settings['enabled_payment_methods'])) {
+            $this->settings['enabled_payment_methods'] = [
+                'cod' => true,
+                'bank_transfer' => true,
+                'card' => false,
+                'online' => false
+            ];
+        }
+        
+        if (!isset($this->settings['payment_method_responses'])) {
+            $this->settings['payment_method_responses'] = [
+                'cod' => '💵 *Cash on Delivery*\nOur delivery team will contact you within 24 hours.\nPlease keep exact cash amount ready.',
+                'bank_transfer' => '🏦 *Bank Transfer*\nAccount: 1234-5678-9012\nBank: ABC Bank\nPlease send us the transfer receipt.',
+                'card' => '💳 *Card Payment*\nOur team will send you a secure payment link shortly.',
+                'online' => '🌐 *Online Payment*\nRedirecting to secure payment gateway...'
+            ];
+        }
+    }
+
     public function saveSettings()
     {
         \Log::info('🔧 SaveSettings: Method called', [
@@ -160,6 +203,9 @@ class EcommerceSettings extends Component
         ]);
         
         try {
+            // Ensure all settings have proper defaults
+            $this->ensureDefaultSettings();
+            
             \Log::info('🔧 SaveSettings: Before validation', [
                 'settings' => $this->settings
             ]);
