@@ -21,6 +21,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
+use Netflie\WhatsAppCloudApi\Message\OptionsList\Row;
+use Netflie\WhatsAppCloudApi\Message\OptionsList\Action;
 use stdClass;
 
 class WhatsAppWebhookController extends Controller
@@ -3277,56 +3279,69 @@ class WhatsAppWebhookController extends Controller
     protected function sendInteractiveButtons($contactNumber, $bodyText, $buttons, $phoneNumberId)
     {
         try {
+            EcommerceLogger::info('Preparing interactive buttons', [
+                'tenant_id' => $this->tenant_id,
+                'phone' => $contactNumber,
+                'buttons' => $buttons
+            ]);
+            
             $whatsapp_cloud_api = new WhatsAppCloudApi([
                 'from_phone_number_id' => $phoneNumberId,
                 'access_token' => get_wa_access_token($this->tenant_id),
             ]);
 
             // Format buttons for WhatsApp API (max 3 buttons)
-            $buttonComponents = [];
+            $rows = [];
             foreach (array_slice($buttons, 0, 3) as $button) {
-                $buttonComponents[] = [
-                    'type' => 'reply',
-                    'reply' => [
-                        'id' => $button['id'],
-                        'title' => substr($button['title'], 0, 20) // Max 20 chars
-                    ]
-                ];
+                $rows[] = new Row(
+                    $button['id'],
+                    substr($button['title'], 0, 24) // Max 24 chars for title
+                );
             }
+            
+            $action = new Action('select_option', $rows);
 
-            $response = $whatsapp_cloud_api->sendButton(
+            $response = $whatsapp_cloud_api->sendList(
                 $contactNumber,
                 $bodyText,
-                $buttonComponents,
-                null, // header
-                null  // footer
+                'Options', // button text
+                [], // sections - we'll use action directly
+                $action
             );
 
-            whatsapp_log('Interactive buttons sent', 'info', [
+            EcommerceLogger::info('Interactive buttons sent successfully', [
                 'contact_number' => $contactNumber,
-                'buttons_count' => count($buttonComponents),
+                'buttons_count' => count($rows),
                 'tenant_id' => $this->tenant_id,
             ]);
 
             return $response;
         } catch (\Exception $e) {
-            whatsapp_log('Failed to send interactive buttons', 'error', [
+            EcommerceLogger::error('Failed to send interactive buttons', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'contact_number' => $contactNumber,
                 'tenant_id' => $this->tenant_id,
             ]);
             
-            // Fallback to text message
+            // Fallback to text message with button text
+            $fallbackText = $bodyText . "\n\n*Quick Actions:*\n";
+            foreach ($buttons as $index => $button) {
+                $fallbackText .= ($index + 1) . ". " . $button['title'] . "\n";
+            }
+            $fallbackText .= "\nReply with the number or button text to proceed.";
+            
             return $this->setWaTenantId($this->tenant_id)->sendMessage($contactNumber, [
                 'type' => 'text',
-                'message' => $bodyText,
-                'reply_text' => $bodyText,
+                'message' => $fallbackText,
+                'reply_text' => $fallbackText,
                 'bot_header' => '',
                 'bot_footer' => '',
                 'rel_type' => 'lead',
                 'rel_id' => 0,
                 'tenant_id' => $this->tenant_id,
                 'sending_count' => 0,
+                'filename' => '',
             ], $phoneNumberId);
         }
     }
