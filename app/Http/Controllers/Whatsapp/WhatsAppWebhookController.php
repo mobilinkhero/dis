@@ -3285,21 +3285,51 @@ class WhatsAppWebhookController extends Controller
                 'buttons' => $buttons
             ]);
             
-            $whatsapp_cloud_api = new WhatsAppCloudApi([
-                'from_phone_number_id' => $phoneNumberId,
-                'access_token' => get_wa_access_token($this->tenant_id),
-            ]);
+            try {
+                $whatsapp_cloud_api = new WhatsAppCloudApi([
+                    'from_phone_number_id' => $phoneNumberId,
+                    'access_token' => get_wa_access_token($this->tenant_id),
+                ]);
+                
+                EcommerceLogger::info('WhatsApp API initialized', [
+                    'tenant_id' => $this->tenant_id,
+                    'phone_number_id' => $phoneNumberId
+                ]);
+            } catch (\Exception $apiEx) {
+                EcommerceLogger::error('Failed to initialize WhatsApp API', [
+                    'error' => $apiEx->getMessage(),
+                    'trace' => $apiEx->getTraceAsString()
+                ]);
+                throw $apiEx;
+            }
 
             // Format buttons for WhatsApp API (max 3 buttons)
-            $buttonRows = [];
-            foreach (array_slice($buttons, 0, 3) as $button) {
-                $buttonRows[] = new Button(
-                    $button['id'],
-                    substr($button['title'], 0, 20) // Max 20 chars for button title
-                );
+            try {
+                $buttonRows = [];
+                foreach (array_slice($buttons, 0, 3) as $button) {
+                    $buttonRows[] = new Button(
+                        $button['id'],
+                        substr($button['title'], 0, 20) // Max 20 chars for button title
+                    );
+                }
+                
+                EcommerceLogger::info('Button objects created', [
+                    'tenant_id' => $this->tenant_id,
+                    'buttons_count' => count($buttonRows)
+                ]);
+                
+                $buttonAction = new ButtonAction($buttonRows);
+                
+                EcommerceLogger::info('ButtonAction created', [
+                    'tenant_id' => $this->tenant_id
+                ]);
+            } catch (\Exception $btnEx) {
+                EcommerceLogger::error('Failed to create Button objects', [
+                    'error' => $btnEx->getMessage(),
+                    'trace' => $btnEx->getTraceAsString()
+                ]);
+                throw $btnEx;
             }
-            
-            $buttonAction = new ButtonAction($buttonRows);
 
             EcommerceLogger::info('Sending button message to WhatsApp', [
                 'tenant_id' => $this->tenant_id,
