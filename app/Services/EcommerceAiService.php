@@ -146,8 +146,8 @@ class EcommerceAiService
             ->post('https://api.openai.com/v1/chat/completions', [
                 'model' => $this->config->ai_model ?? 'gpt-3.5-turbo',
                 'messages' => $messages,
-                'temperature' => $this->config->ai_temperature ?? 0.7,
-                'max_tokens' => $this->config->ai_max_tokens ?? 1000,
+                'temperature' => (float) ($this->config->ai_temperature ?? 0.7),
+                'max_tokens' => (int) ($this->config->ai_max_tokens ?? 1000),
             ]);
 
             if ($response->successful()) {

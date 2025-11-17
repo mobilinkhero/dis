@@ -256,24 +256,22 @@ class WhatsAppWebhookController extends Controller
                                     $contact_number, 
                                     $trigger_msg, 
                                     $ecommerceResult['response'],
-                                    ['source' => 'WhatsApp Webhook']
+                                    $this->tenant_id,
+                                    'WhatsApp Webhook'
                                 );
 
                                 // Send e-commerce response
                                 $ecommerceMessage = [
+                                    'id' => uniqid('ecommerce_'),
                                     'type' => 'text',
                                     'message' => $ecommerceResult['response'],
                                     'reply_text' => $ecommerceResult['response'],
-                                    'bot_header' => '',
-                                    'bot_footer' => '',
-                                    'rel_type' => $contact_data->type ?? 'lead',
+                                    'rel_type' => 'contact',
                                     'rel_id' => $contact_data->id,
                                     'tenant_id' => $this->tenant_id,
                                     'sending_count' => 0,
-                                    'filename' => '',
+                                    'filename' => ''
                                 ];
-                                
-                                // Add interactive buttons if provided
                                 try {
                                     if (!empty($ecommerceResult['buttons'])) {
                                         EcommerceLogger::info('Sending message with interactive buttons', [
