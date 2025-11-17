@@ -36,36 +36,24 @@ class EcommerceOrderService
     public function processMessage(string $message, Contact $contact): array
     {
         try {
-            EcommerceLogger::botInteraction(
-                $contact->phone ?? 'unknown', 
-                $message, 
-                'Processing started',
-                ['method' => 'processMessage']
-            );
+            EcommerceLogger::info('Processing WhatsApp message for e-commerce', [
+                'tenant_id' => $this->tenantId,
+                'phone' => $contact->phone ?? 'unknown',
+                'message' => $message
+            ]);
 
-            // Check if e-commerce is configured
-            if (!$this->config) {
-                EcommerceLogger::warning('E-commerce configuration not found', [
-                    'tenant_id' => $this->tenantId
-                ]);
-                
-                return [
-                    'handled' => false,
-                    'response' => null
-                ];
-            }
+            EcommerceLogger::botInteraction($contact->phone ?? 'unknown', $message, 'Processing started');
 
-            if (!$this->config->isFullyConfigured()) {
-                EcommerceLogger::warning('E-commerce not fully configured', [
+            if (!$this->config || !$this->config->isFullyConfigured()) {
+                EcommerceLogger::warning('E-commerce not configured', [
                     'tenant_id' => $this->tenantId,
-                    'is_configured' => $this->config->is_configured,
-                    'has_sheets_url' => !empty($this->config->google_sheets_url),
-                    'sheets_url' => $this->config->google_sheets_url
+                    'has_config' => $this->config !== null,
+                    'is_configured' => $this->config ? $this->config->isFullyConfigured() : false
                 ]);
                 
                 return [
                     'handled' => false,
-                    'response' => null
+                    'response' => ''
                 ];
             }
 
@@ -76,9 +64,15 @@ class EcommerceOrderService
 
             $this->currentContact = $contact;
             
-            // Use AI to detect intent and extract product information
+            // Check if this is a button click
+            if (preg_match('/^(buy|add_cart|more_info)_(\d+)$/', $message, $matches)) {
+                return $this->handleButtonClick($matches[1], $matches[2]);
+            }
+            
+            // Detect intent using AI or fallback
             $intent = $this->detectMessageIntent($message);
             
+            // Handle based on intent
             switch ($intent['type']) {
                 case 'browse_products':
                     return $this->handleBrowseProducts($intent);
@@ -90,7 +84,7 @@ class EcommerceOrderService
                     return $this->handleAddToCart($intent);
                 
                 case 'view_cart':
-                    return $this->handleViewCart();
+                    return $this->handleViewCart($intent);
                 
                 case 'checkout':
                     return $this->handleCheckout($intent);
@@ -361,6 +355,42 @@ Return JSON format:
 
         $response = "🔍 *Here's what I found:*\n\n";
         
+        // If single product, show with buttons
+        if ($products->count() === 1) {
+            $product = $products->first();
+            $response .= "📦 *{$product->name}*\n";
+            $response .= "💰 {$product->formatted_price}";
+            
+            if ($product->is_on_sale) {
+                $response .= " ~~\${$product->price}~~ 🏷️";
+            }
+            
+            $response .= "\n📋 {$product->description}\n";
+            $response .= "📊 Available: {$product->stock_quantity} units\n\n";
+            
+            // Return with interactive buttons
+            return [
+                'handled' => true,
+                'response' => $response,
+                'buttons' => [
+                    [
+                        'id' => 'buy_' . $product->id,
+                        'title' => '🛒 Buy Now'
+                    ],
+                    [
+                        'id' => 'add_cart_' . $product->id,
+                        'title' => '➕ Add to Cart'
+                    ],
+                    [
+                        'id' => 'more_info_' . $product->id,
+                        'title' => 'ℹ️ More Info'
+                    ]
+                ],
+                'product_id' => $product->id
+            ];
+        }
+        
+        // Multiple products - show list
         foreach ($products as $product) {
             $response .= "📦 *{$product->name}*\n";
             $response .= "💰 {$product->formatted_price}";
@@ -373,17 +403,10 @@ Return JSON format:
             $response .= "📊 Available: {$product->stock_quantity} units\n\n";
         }
 
-        // AI-powered recommendations
-        $recommendations = $this->getAIRecommendations($products->first());
-        if (!empty($recommendations)) {
-            $response .= "💡 *You might also like:*\n";
-            foreach ($recommendations as $rec) {
-                $response .= "• {$rec->name} - {$rec->formatted_price}\n";
-            }
-            $response .= "\n";
-        }
-
-        $response .= "To order, just tell me the quantity you want! 🛒";
+        $response .= "💬 *To order, just tell me:*\n";
+        $response .= "• Product name you want\n";
+        $response .= "• Or type the exact product name for quick buy options\n\n";
+        $response .= "Example: \"Web Camera HD\" 🛒";
 
         return [
             'handled' => true,
@@ -802,5 +825,141 @@ Don't make up specific products or prices. Focus on being helpful and guiding th
         }
 
         return $recommendations->toArray();
+    }
+
+    /**
+     * Handle button click from interactive buttons
+     */
+    protected function handleButtonClick(string $action, int $productId): array
+    {
+        $product = Product::where('tenant_id', $this->tenantId)
+            ->where('id', $productId)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$product) {
+            return [
+                'handled' => true,
+                'response' => "Sorry, this product is no longer available. 😕\n\nType 'catalog' to see our current products!"
+            ];
+        }
+
+        switch ($action) {
+            case 'buy':
+                // Buy Now - Ask for quantity and payment method
+                return [
+                    'handled' => true,
+                    'response' => "🛒 *{$product->name}*\n💰 {$product->formatted_price}\n\n" .
+                                 "Great choice! How would you like to proceed?\n\n" .
+                                 "📦 *Quantity:* How many units do you want?\n" .
+                                 "💳 *Payment:* Choose your payment method:\n\n" .
+                                 "Reply with:\n" .
+                                 "• \"1 unit, Cash on Delivery\"\n" .
+                                 "• \"2 units, Bank Transfer\"\n" .
+                                 "• Or just tell me your preference!",
+                    'buttons' => [
+                        [
+                            'id' => 'qty_1_' . $productId,
+                            'title' => '1 Unit - COD'
+                        ],
+                        [
+                            'id' => 'qty_2_' . $productId,
+                            'title' => '2 Units - COD'
+                        ],
+                        [
+                            'id' => 'custom_qty_' . $productId,
+                            'title' => 'Custom Order'
+                        ]
+                    ]
+                ];
+
+            case 'add_cart':
+                // Add to Cart - Add 1 unit
+                $order = $this->getCurrentOrder();
+                $existingItem = $order->items()->where('product_id', $productId)->first();
+
+                if ($existingItem) {
+                    $existingItem->increment('quantity');
+                    $existingItem->update(['total_price' => $existingItem->quantity * $product->sale_price]);
+                } else {
+                    $order->items()->create([
+                        'product_id' => $productId,
+                        'quantity' => 1,
+                        'unit_price' => $product->sale_price,
+                        'total_price' => $product->sale_price
+                    ]);
+                }
+
+                $order->updateTotals();
+
+                return [
+                    'handled' => true,
+                    'response' => "✅ *Added to cart!*\n\n" .
+                                 "📦 {$product->name}\n" .
+                                 "💰 {$product->formatted_price}\n" .
+                                 "📊 Quantity: 1\n\n" .
+                                 "🛒 *Your Cart:* {$order->items->count()} items | Total: \${$order->total_amount}\n\n" .
+                                 "What would you like to do next?",
+                    'buttons' => [
+                        [
+                            'id' => 'view_cart',
+                            'title' => '🛒 View Cart'
+                        ],
+                        [
+                            'id' => 'checkout',
+                            'title' => '💳 Checkout'
+                        ],
+                        [
+                            'id' => 'browse_products',
+                            'title' => '🛍️ Continue Shopping'
+                        ]
+                    ]
+                ];
+
+            case 'more_info':
+                // Show detailed product information
+                $response = "📦 *{$product->name}*\n\n";
+                $response .= "💰 *Price:* {$product->formatted_price}";
+                
+                if ($product->is_on_sale) {
+                    $response .= " ~~\${$product->price}~~ 🏷️ SALE!";
+                }
+                
+                $response .= "\n\n📋 *Description:*\n{$product->description}\n\n";
+                $response .= "📊 *Stock:* {$product->stock_quantity} units available\n";
+                
+                if ($product->category) {
+                    $response .= "🏷️ *Category:* {$product->category}\n";
+                }
+                
+                if ($product->sku) {
+                    $response .= "🔖 *SKU:* {$product->sku}\n";
+                }
+
+                return [
+                    'handled' => true,
+                    'response' => $response,
+                    'buttons' => [
+                        [
+                            'id' => 'buy_' . $productId,
+                            'title' => '🛒 Buy Now'
+                        ],
+                        [
+                            'id' => 'add_cart_' . $productId,
+                            'title' => '➕ Add to Cart'
+                        ],
+                        [
+                            'id' => 'browse_products',
+                            'title' => '◀️ Back to Catalog'
+                        ]
+                    ]
+                ];
+
+            default:
+                return [
+                    'handled' => true,
+                    'response' => "I'm here to help! 😊\n\nType 'catalog' to see products or 'help' for more options."
+                ];
+        }
     }
 }

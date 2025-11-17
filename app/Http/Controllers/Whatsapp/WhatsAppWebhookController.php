@@ -272,7 +272,17 @@ class WhatsAppWebhookController extends Controller
                                     'sending_count' => 0,
                                 ];
                                 
-                                $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $ecommerceMessage, $metadata['phone_number_id']);
+                                // Add interactive buttons if provided
+                                if (!empty($ecommerceResult['buttons'])) {
+                                    $response = $this->sendInteractiveButtons(
+                                        $contact_number,
+                                        $ecommerceResult['response'],
+                                        $ecommerceResult['buttons'],
+                                        $metadata['phone_number_id']
+                                    );
+                                } else {
+                                    $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $ecommerceMessage, $metadata['phone_number_id']);
+                                }
                                 
                                 $chatId = $this->createOrUpdateInteraction(
                                     $contact_number, 
@@ -3236,6 +3246,66 @@ class WhatsAppWebhookController extends Controller
                 'error' => $e->getMessage(),
                 'contact_number' => $contactNumber,
             ]);
+        }
+    }
+
+    /**
+     * Send interactive buttons for e-commerce
+     */
+    protected function sendInteractiveButtons($contactNumber, $bodyText, $buttons, $phoneNumberId)
+    {
+        try {
+            $whatsapp_cloud_api = new WhatsAppCloudApi([
+                'from_phone_number_id' => $phoneNumberId,
+                'access_token' => get_wa_access_token($this->tenant_id),
+            ]);
+
+            // Format buttons for WhatsApp API (max 3 buttons)
+            $buttonComponents = [];
+            foreach (array_slice($buttons, 0, 3) as $button) {
+                $buttonComponents[] = [
+                    'type' => 'reply',
+                    'reply' => [
+                        'id' => $button['id'],
+                        'title' => substr($button['title'], 0, 20) // Max 20 chars
+                    ]
+                ];
+            }
+
+            $response = $whatsapp_cloud_api->sendButton(
+                $contactNumber,
+                $bodyText,
+                $buttonComponents,
+                null, // header
+                null  // footer
+            );
+
+            whatsapp_log('Interactive buttons sent', 'info', [
+                'contact_number' => $contactNumber,
+                'buttons_count' => count($buttonComponents),
+                'tenant_id' => $this->tenant_id,
+            ]);
+
+            return $response;
+        } catch (\Exception $e) {
+            whatsapp_log('Failed to send interactive buttons', 'error', [
+                'error' => $e->getMessage(),
+                'contact_number' => $contactNumber,
+                'tenant_id' => $this->tenant_id,
+            ]);
+            
+            // Fallback to text message
+            return $this->setWaTenantId($this->tenant_id)->sendMessage($contactNumber, [
+                'type' => 'text',
+                'message' => $bodyText,
+                'reply_text' => $bodyText,
+                'bot_header' => '',
+                'bot_footer' => '',
+                'rel_type' => 'lead',
+                'rel_id' => 0,
+                'tenant_id' => $this->tenant_id,
+                'sending_count' => 0,
+            ], $phoneNumberId);
         }
     }
 }
