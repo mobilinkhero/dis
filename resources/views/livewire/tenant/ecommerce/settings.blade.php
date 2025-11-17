@@ -242,12 +242,12 @@
 
                 <!-- AI Settings Save Button -->
                 <div class="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-600">
-                    <button wire:click="saveSettings" 
+                    <button wire:click="saveAiSettings" 
                             wire:loading.attr="disabled"
                             wire:loading.class="opacity-50"
                             class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition flex items-center gap-2">
-                        <span wire:loading.remove wire:target="saveSettings">💾 Save AI Settings</span>
-                        <span wire:loading wire:target="saveSettings">Saving...</span>
+                        <span wire:loading.remove wire:target="saveAiSettings">🤖 Save AI Settings Only</span>
+                        <span wire:loading wire:target="saveAiSettings">Saving AI...</span>
                     </button>
                 </div>
             </div>

@@ -236,6 +236,69 @@ class EcommerceSettings extends Component
         }
     }
 
+    public function saveAiSettings()
+    {
+        try {
+            \Log::info('Saving AI settings only', [
+                'ai_enabled' => $this->settings['ai_enabled'] ?? 'not_set',
+                'ai_api_key' => isset($this->settings['ai_api_key']) ? 'SET' : 'NOT_SET',
+                'ai_model' => $this->settings['ai_model'] ?? 'not_set'
+            ]);
+
+            // Validate only AI settings
+            $this->validate([
+                'settings.ai_enabled' => 'boolean',
+                'settings.ai_provider' => 'nullable|string',
+                'settings.ai_api_key' => 'nullable|string',
+                'settings.ai_model' => 'nullable|string',
+                'settings.ai_temperature' => 'nullable|numeric|min:0|max:1',
+                'settings.ai_max_tokens' => 'nullable|integer|min:100|max:4000',
+                'settings.ai_system_prompt' => 'nullable|string|max:2000',
+                'settings.ai_product_recommendations' => 'boolean',
+                'settings.ai_order_processing' => 'boolean',
+                'settings.ai_customer_support' => 'boolean',
+                'settings.ai_response_timeout' => 'nullable|integer|min:5|max:120',
+                'settings.ai_fallback_message' => 'nullable|string|max:500',
+            ]);
+
+            if (!$this->config) {
+                $this->notify(['type' => 'danger', 'message' => 'Please complete e-commerce setup first']);
+                return redirect()->to(tenant_route('tenant.ecommerce.setup'));
+            }
+
+            // Update only AI settings
+            $aiData = [
+                'ai_enabled' => $this->settings['ai_enabled'] ?? false,
+                'ai_provider' => $this->settings['ai_provider'] ?? 'openai',
+                'ai_api_key' => $this->settings['ai_api_key'] ?? '',
+                'ai_model' => $this->settings['ai_model'] ?? 'gpt-3.5-turbo',
+                'ai_temperature' => (float) ($this->settings['ai_temperature'] ?? 0.7),
+                'ai_max_tokens' => (int) ($this->settings['ai_max_tokens'] ?? 1000),
+                'ai_system_prompt' => $this->settings['ai_system_prompt'] ?? '',
+                'ai_product_recommendations' => $this->settings['ai_product_recommendations'] ?? true,
+                'ai_order_processing' => $this->settings['ai_order_processing'] ?? true,
+                'ai_customer_support' => $this->settings['ai_customer_support'] ?? true,
+                'ai_response_timeout' => (int) ($this->settings['ai_response_timeout'] ?? 30),
+                'ai_fallback_message' => $this->settings['ai_fallback_message'] ?? '',
+            ];
+
+            \Log::info('Updating AI config only', $aiData);
+            
+            $this->config->update($aiData);
+
+            \Log::info('AI settings saved successfully');
+            $this->notify(['type' => 'success', 'message' => '🤖 AI settings saved successfully! Your ChatGPT integration is now configured.']);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('AI validation failed', ['errors' => $e->errors()]);
+            $errorMessages = collect($e->errors())->flatten()->implode(', ');
+            $this->notify(['type' => 'danger', 'message' => 'AI validation failed: ' . $errorMessages]);
+        } catch (\Exception $e) {
+            \Log::error('Save AI settings failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            $this->notify(['type' => 'danger', 'message' => 'Error saving AI settings: ' . $e->getMessage()]);
+        }
+    }
+
     public function resetToDefaults()
     {
         $this->settings = [
