@@ -251,6 +251,14 @@ class WhatsAppWebhookController extends Controller
                             $ecommerceService = new EcommerceOrderService($this->tenant_id);
                             $ecommerceResult = $ecommerceService->processMessage($trigger_msg, $contact_data);
                             
+                            EcommerceLogger::info('Ecommerce result check', [
+                                'tenant_id' => $this->tenant_id,
+                                'handled' => $ecommerceResult['handled'] ?? 'not_set',
+                                'response' => $ecommerceResult['response'] ?? 'not_set',
+                                'response_length' => isset($ecommerceResult['response']) ? strlen($ecommerceResult['response']) : 0,
+                                'has_buttons' => !empty($ecommerceResult['buttons'])
+                            ]);
+                            
                             if ($ecommerceResult['handled'] && $ecommerceResult['response']) {
                                 EcommerceLogger::botInteraction(
                                     $contact_number, 

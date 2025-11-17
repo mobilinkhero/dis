@@ -208,32 +208,37 @@ class EcommerceAiService
             'actions' => []
         ];
 
-        // Check for button trigger
-        if (preg_match('/\[BUTTONS:(\d+)\]/', $response, $matches)) {
-            $productId = $matches[1];
+        // Check for button trigger (ID or name)
+        if (preg_match('/\[BUTTONS:([^\]]+)\]/', $response, $matches)) {
+            $identifier = $matches[1];
+            
+            // Try to find product by ID first, then by name
             $product = Product::where('tenant_id', $this->tenantId)
-                ->where('id', $productId)
+                ->where(function($query) use ($identifier) {
+                    $query->where('id', $identifier)
+                          ->orWhere('name', $identifier);
+                })
                 ->first();
                 
             if ($product) {
                 $result['buttons'] = [
                     [
-                        'id' => 'buy_' . $productId,
+                        'id' => 'buy_' . $product->id,
                         'title' => '🛒 Buy Now'
                     ],
                     [
-                        'id' => 'add_cart_' . $productId, 
+                        'id' => 'add_cart_' . $product->id, 
                         'title' => '➕ Add to Cart'
                     ],
                     [
-                        'id' => 'more_info_' . $productId,
+                        'id' => 'more_info_' . $product->id,
                         'title' => 'ℹ️ More Info'
                     ]
                 ];
             }
             
             // Remove the button trigger from message
-            $result['message'] = preg_replace('/\[BUTTONS:\d+\]/', '', $response);
+            $result['message'] = preg_replace('/\[BUTTONS:[^\]]+\]/', '', $response);
         }
 
         // Check for order creation trigger
