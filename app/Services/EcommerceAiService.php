@@ -40,6 +40,12 @@ class EcommerceAiService
             // Get products context
             $products = $this->getProductsContext();
             
+            EcommerceLogger::info('Products loaded for AI context', [
+                'tenant_id' => $this->tenantId,
+                'product_count' => count($products),
+                'products' => array_column($products, 'name')
+            ]);
+            
             // Get conversation history
             $conversationHistory = $this->getConversationHistory($contact);
             

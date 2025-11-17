@@ -266,6 +266,8 @@ class WhatsAppWebhookController extends Controller
                                     'type' => 'text',
                                     'message' => $ecommerceResult['response'],
                                     'reply_text' => $ecommerceResult['response'],
+                                    'bot_header' => '',
+                                    'bot_footer' => '',
                                     'rel_type' => 'contact',
                                     'rel_id' => $contact_data->id,
                                     'tenant_id' => $this->tenant_id,
@@ -306,10 +308,17 @@ class WhatsAppWebhookController extends Controller
                                     } else {
                                         EcommerceLogger::info('Sending message without buttons', [
                                             'tenant_id' => $this->tenant_id,
-                                            'phone' => $contact_number
+                                            'phone' => $contact_number,
+                                            'message_data' => $ecommerceMessage
                                         ]);
                                         
                                         $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $ecommerceMessage, $metadata['phone_number_id']);
+                                        
+                                        EcommerceLogger::info('WhatsApp send response', [
+                                            'tenant_id' => $this->tenant_id,
+                                            'phone' => $contact_number,
+                                            'response' => $response
+                                        ]);
                                     }
                                     
                                     $chatId = $this->createOrUpdateInteraction(
