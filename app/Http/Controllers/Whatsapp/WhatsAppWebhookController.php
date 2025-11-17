@@ -274,28 +274,49 @@ class WhatsAppWebhookController extends Controller
                                 ];
                                 
                                 // Add interactive buttons if provided
-                                if (!empty($ecommerceResult['buttons'])) {
-                                    $response = $this->sendInteractiveButtons(
-                                        $contact_number,
-                                        $ecommerceResult['response'],
-                                        $ecommerceResult['buttons'],
-                                        $metadata['phone_number_id']
+                                try {
+                                    if (!empty($ecommerceResult['buttons'])) {
+                                        EcommerceLogger::info('Sending message with interactive buttons', [
+                                            'tenant_id' => $this->tenant_id,
+                                            'phone' => $contact_number,
+                                            'buttons_count' => count($ecommerceResult['buttons'])
+                                        ]);
+                                        
+                                        $response = $this->sendInteractiveButtons(
+                                            $contact_number,
+                                            $ecommerceResult['response'],
+                                            $ecommerceResult['buttons'],
+                                            $metadata['phone_number_id']
+                                        );
+                                    } else {
+                                        EcommerceLogger::info('Sending message without buttons', [
+                                            'tenant_id' => $this->tenant_id,
+                                            'phone' => $contact_number
+                                        ]);
+                                        
+                                        $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $ecommerceMessage, $metadata['phone_number_id']);
+                                    }
+                                    
+                                    $chatId = $this->createOrUpdateInteraction(
+                                        $contact_number, 
+                                        $message_data['metadata']['display_phone_number'], 
+                                        $message_data['metadata']['phone_number_id'], 
+                                        $contact_data->firstname.' '.$contact_data->lastname, 
+                                        '', 
+                                        '', 
+                                        false
                                     );
-                                } else {
-                                    $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $ecommerceMessage, $metadata['phone_number_id']);
+                                    
+                                    $this->storeBotMessages($ecommerceMessage, $chatId, $contact_data, 'ecommerce_bot', $response);
+                                } catch (\Exception $sendEx) {
+                                    EcommerceLogger::error('Failed to send e-commerce message', [
+                                        'tenant_id' => $this->tenant_id,
+                                        'phone' => $contact_number,
+                                        'exception' => $sendEx->getMessage(),
+                                        'trace' => $sendEx->getTraceAsString()
+                                    ]);
+                                    throw $sendEx;
                                 }
-                                
-                                $chatId = $this->createOrUpdateInteraction(
-                                    $contact_number, 
-                                    $message_data['metadata']['display_phone_number'], 
-                                    $message_data['metadata']['phone_number_id'], 
-                                    $contact_data->firstname.' '.$contact_data->lastname, 
-                                    '', 
-                                    '', 
-                                    false
-                                );
-                                
-                                $this->storeBotMessages($ecommerceMessage, $chatId, $contact_data, 'ecommerce_bot', $response);
                                 
                                 EcommerceLogger::info('E-commerce response sent successfully', [
                                     'tenant_id' => $this->tenant_id,
