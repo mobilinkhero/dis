@@ -23,7 +23,6 @@ class EcommerceSettings extends Component
     public $settings = [
         'currency' => 'USD',
         'tax_rate' => '0.00',
-        'payment_methods' => [],
         'collect_customer_details' => true,
         'required_customer_fields' => [
             'name' => true,
@@ -66,14 +65,10 @@ class EcommerceSettings extends Component
     ];
 
     public $availablePaymentMethods = [
-        'cash_on_delivery' => 'Cash on Delivery',
+        'cod' => 'Cash on Delivery',
         'bank_transfer' => 'Bank Transfer',
-        'upi' => 'UPI Payment',
-        'credit_card' => 'Credit Card',
-        'debit_card' => 'Debit Card',
-        'paypal' => 'PayPal',
-        'stripe' => 'Stripe',
-        'razorpay' => 'Razorpay'
+        'card' => 'Credit/Debit Card',
+        'online' => 'Online Payment'
     ];
 
     public $availableCurrencies = [
@@ -89,7 +84,15 @@ class EcommerceSettings extends Component
     protected $rules = [
         'settings.currency' => 'required|string|in:USD,EUR,GBP,INR,JPY,AUD,CAD',
         'settings.tax_rate' => 'required|numeric|min:0|max:100',
-        'settings.payment_methods' => 'required|array|min:1',
+        'settings.collect_customer_details' => 'boolean',
+        'settings.enabled_payment_methods.cod' => 'boolean',
+        'settings.enabled_payment_methods.bank_transfer' => 'boolean',
+        'settings.enabled_payment_methods.card' => 'boolean',
+        'settings.enabled_payment_methods.online' => 'boolean',
+        'settings.payment_method_responses.cod' => 'nullable|string|max:500',
+        'settings.payment_method_responses.bank_transfer' => 'nullable|string|max:500',
+        'settings.payment_method_responses.card' => 'nullable|string|max:500',
+        'settings.payment_method_responses.online' => 'nullable|string|max:500',
         'settings.order_confirmation_message' => 'nullable|string|max:1000',
         'settings.payment_confirmation_message' => 'nullable|string|max:1000',
         'settings.ai_recommendations_enabled' => 'boolean',
@@ -122,7 +125,6 @@ class EcommerceSettings extends Component
             $this->settings = [
                 'currency' => $this->config->currency ?? 'USD',
                 'tax_rate' => number_format($this->config->tax_rate ?? 0, 2),
-                'payment_methods' => $this->config->payment_methods ?? ['cash_on_delivery'],
                 'collect_customer_details' => $this->config->collect_customer_details ?? true,
                 'required_customer_fields' => $this->config->getRequiredCustomerFields(),
                 'enabled_payment_methods' => $this->config->getEnabledPaymentMethods(),
@@ -162,7 +164,6 @@ class EcommerceSettings extends Component
             $this->config->update([
                 'currency' => $this->settings['currency'],
                 'tax_rate' => (float) $this->settings['tax_rate'],
-                'payment_methods' => $this->settings['payment_methods'],
                 'collect_customer_details' => $this->settings['collect_customer_details'],
                 'required_customer_fields' => $this->settings['required_customer_fields'],
                 'enabled_payment_methods' => $this->settings['enabled_payment_methods'],
