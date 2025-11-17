@@ -11,17 +11,16 @@
             </div>
             
             <div class="flex gap-3">
-                <a href="{{ tenant_route('tenant.ecommerce.ai-settings') }}" 
-                   class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2">
-                    🤖 AI Settings
-                </a>
                 <button wire:click="resetToDefaults" 
                         class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
                     Reset to Defaults
                 </button>
                 <button wire:click="saveSettings" 
+                        wire:loading.attr="disabled"
+                        wire:loading.class="opacity-50"
                         class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    Save Settings
+                    <span wire:loading.remove wire:target="saveSettings">💾 Save All Settings</span>
+                    <span wire:loading wire:target="saveSettings">Saving...</span>
                 </button>
             </div>
         </div>

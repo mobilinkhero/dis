@@ -104,6 +104,20 @@ class EcommerceSettings extends Component
         'settings.shipping_settings.enabled' => 'boolean',
         'settings.shipping_settings.free_shipping_threshold' => 'required_if:settings.shipping_settings.enabled,true|numeric|min:0',
         'settings.shipping_settings.default_shipping_cost' => 'required_if:settings.shipping_settings.enabled,true|numeric|min:0',
+        
+        // AI Settings Validation
+        'settings.ai_enabled' => 'boolean',
+        'settings.ai_provider' => 'required_if:settings.ai_enabled,true|string|in:openai',
+        'settings.ai_api_key' => 'required_if:settings.ai_enabled,true|string',
+        'settings.ai_model' => 'required_if:settings.ai_enabled,true|string',
+        'settings.ai_temperature' => 'required_if:settings.ai_enabled,true|numeric|min:0|max:1',
+        'settings.ai_max_tokens' => 'required_if:settings.ai_enabled,true|integer|min:100|max:4000',
+        'settings.ai_system_prompt' => 'nullable|string|max:2000',
+        'settings.ai_product_recommendations' => 'boolean',
+        'settings.ai_order_processing' => 'boolean',
+        'settings.ai_customer_support' => 'boolean',
+        'settings.ai_response_timeout' => 'required_if:settings.ai_enabled,true|integer|min:5|max:120',
+        'settings.ai_fallback_message' => 'nullable|string|max:500',
     ];
 
     public function mount()
@@ -227,7 +241,20 @@ class EcommerceSettings extends Component
                 'enabled' => false,
                 'free_shipping_threshold' => 0,
                 'default_shipping_cost' => 0
-            ]
+            ],
+            // AI Settings Defaults
+            'ai_enabled' => false,
+            'ai_provider' => 'openai',
+            'ai_api_key' => '',
+            'ai_model' => 'gpt-3.5-turbo',
+            'ai_temperature' => 0.7,
+            'ai_max_tokens' => 1000,
+            'ai_system_prompt' => $this->getDefaultSystemPrompt(),
+            'ai_product_recommendations' => true,
+            'ai_order_processing' => true,
+            'ai_customer_support' => true,
+            'ai_response_timeout' => 30,
+            'ai_fallback_message' => 'I apologize, but I\'m temporarily unavailable. A human agent will assist you shortly.'
         ];
 
         $this->notify(['type' => 'info', 'message' => 'Settings reset to defaults']);
@@ -473,6 +500,7 @@ Always be polite, professional, and focus on helping the customer make the best 
         return view('livewire.tenant.ecommerce.settings', [
             'availablePaymentMethods' => $this->availablePaymentMethods,
             'availableCurrencies' => $this->availableCurrencies,
+            'availableAiModels' => $this->availableAiModels,
         ]);
     }
 }
