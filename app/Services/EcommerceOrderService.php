@@ -69,70 +69,48 @@ class EcommerceOrderService
                 return $this->handleButtonClick($matches[1], $matches[2]);
             }
             
-            // **NEW: Try AI first if enabled**
+            // **AI ONLY PROCESSING - No Manual Fallback**
             $aiService = new \App\Services\EcommerceAiService($this->tenantId);
-            if ($aiService->isAiEnabled()) {
-                EcommerceLogger::info('Processing message with AI', [
-                    'tenant_id' => $this->tenantId,
-                    'ai_model' => $this->config->ai_model ?? 'default'
+            
+            if (!$aiService->isAiEnabled()) {
+                EcommerceLogger::warning('AI not configured for e-commerce', [
+                    'tenant_id' => $this->tenantId
                 ]);
                 
-                $aiResult = $aiService->processMessage($message, $contact);
-                
-                if ($aiResult['handled']) {
-                    // Process any AI-requested actions
-                    if (!empty($aiResult['actions'])) {
-                        foreach ($aiResult['actions'] as $action) {
-                            $this->processAiAction($action, $contact);
-                        }
+                return [
+                    'handled' => true,
+                    'response' => "🤖 **AI Assistant Setup Required**\n\nOur e-commerce bot needs AI configuration to help you.\n\nPlease ask your admin to:\n1. Go to E-commerce Settings\n2. Enable AI Assistant\n3. Add ChatGPT API Key\n4. Select AI Model\n\n💡 Once configured, I'll be able to help with products, orders, and more!"
+                ];
+            }
+            
+            EcommerceLogger::info('Processing message with AI', [
+                'tenant_id' => $this->tenantId,
+                'ai_model' => $this->config->ai_model ?? 'default'
+            ]);
+            
+            $aiResult = $aiService->processMessage($message, $contact);
+            
+            if ($aiResult['handled']) {
+                // Process any AI-requested actions
+                if (!empty($aiResult['actions'])) {
+                    foreach ($aiResult['actions'] as $action) {
+                        $this->processAiAction($action, $contact);
                     }
-                    
-                    EcommerceLogger::info('AI handled message successfully', [
-                        'tenant_id' => $this->tenantId,
-                        'has_buttons' => !empty($aiResult['buttons'])
-                    ]);
-                    
-                    return $aiResult;
                 }
                 
-                EcommerceLogger::info('AI could not handle message, falling back to manual', [
-                    'tenant_id' => $this->tenantId
+                EcommerceLogger::info('AI handled message successfully', [
+                    'tenant_id' => $this->tenantId,
+                    'has_buttons' => !empty($aiResult['buttons'])
                 ]);
-            } else {
-                EcommerceLogger::info('AI not enabled, using manual processing', [
-                    'tenant_id' => $this->tenantId
-                ]);
+                
+                return $aiResult;
             }
             
-            // Fallback to manual processing
-            $intent = $this->detectMessageIntent($message);
-            
-            // Handle based on intent
-            switch ($intent['type']) {
-                case 'browse_products':
-                    return $this->handleBrowseProducts($intent);
-                
-                case 'product_inquiry':
-                    return $this->handleProductInquiry($intent);
-                
-                case 'add_to_cart':
-                    return $this->handleAddToCart($intent);
-                
-                case 'view_cart':
-                    return $this->handleViewCart($intent);
-                
-                case 'checkout':
-                    return $this->handleCheckout($intent);
-                
-                case 'order_status':
-                    return $this->handleOrderStatus($intent);
-                
-                case 'help':
-                    return $this->handleHelp();
-                
-                default:
-                    return $this->handleUnknownMessage($message);
-            }
+            // If AI couldn't handle it, provide a helpful response
+            return [
+                'handled' => true,
+                'response' => "🤖 I'm still learning! Let me try to help you better.\n\nYou can:\n• Ask about our products\n• Request product details\n• Place an order\n• Check order status\n• Get support\n\nWhat would you like to do?"
+            ];
         } catch (\Exception $e) {
             EcommerceLogger::error('Error processing message', [
                 'tenant_id' => $this->tenantId,

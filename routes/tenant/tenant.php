@@ -282,6 +282,7 @@ Route::middleware(['auth', TenantMiddleware::class, CheckTenantDeleted::class, E
                 Route::get('/orders', \App\Livewire\Tenant\Ecommerce\OrderManager::class)->name('orders');
                 Route::get('/analytics', \App\Livewire\Tenant\Ecommerce\EcommerceAnalytics::class)->name('analytics');
                 Route::get('/settings', \App\Livewire\Tenant\Ecommerce\EcommerceSettings::class)->name('settings');
+                Route::get('/ai-settings', \App\Livewire\Tenant\Ecommerce\AiSettings::class)->name('ai-settings');
             });
             Route::get('/custom-fields/{customFieldId}/edit', CustomFieldCreator::class)->name('custom-fields.edit');
 
