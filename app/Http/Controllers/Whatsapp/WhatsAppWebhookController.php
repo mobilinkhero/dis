@@ -270,6 +270,7 @@ class WhatsAppWebhookController extends Controller
                                     'rel_id' => $contact_data->id,
                                     'tenant_id' => $this->tenant_id,
                                     'sending_count' => 0,
+                                    'filename' => '',
                                 ];
                                 
                                 // Add interactive buttons if provided
