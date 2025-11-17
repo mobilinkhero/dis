@@ -84,24 +84,103 @@
                     </div>
                 </div>
 
-                <!-- Payment Methods -->
+                <!-- Customer Details Collection -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Payment Methods
-                    </label>
-                    <div class="grid grid-cols-2 gap-3">
-                        @foreach($availablePaymentMethods as $method => $label)
-                            <label class="flex items-center space-x-2">
-                                <input type="checkbox" 
-                                       wire:model="settings.payment_methods"
-                                       value="{{ $method }}"
-                                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                <span class="text-sm text-gray-700 dark:text-gray-300">{{ $label }}</span>
-                            </label>
-                        @endforeach
+                    <div class="flex items-center space-x-2 mb-3">
+                        <input type="checkbox" 
+                               wire:model="settings.collect_customer_details"
+                               id="collect_details"
+                               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <label for="collect_details" class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Collect Customer Details During Checkout
+                        </label>
                     </div>
-                    @error('settings.payment_methods') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                    
+                    @if($settings['collect_customer_details'] ?? false)
+                        <div class="ml-6 space-y-2">
+                            <p class="text-xs text-gray-500 mb-3">Select which details to require from customers:</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="flex items-center space-x-2">
+                                    <input type="checkbox" 
+                                           wire:model="settings.required_customer_fields.name"
+                                           class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    <span class="text-sm text-gray-600 dark:text-gray-400">👤 Full Name</span>
+                                </label>
+                                <label class="flex items-center space-x-2">
+                                    <input type="checkbox" 
+                                           wire:model="settings.required_customer_fields.phone"
+                                           class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    <span class="text-sm text-gray-600 dark:text-gray-400">📱 Phone Number</span>
+                                </label>
+                                <label class="flex items-center space-x-2">
+                                    <input type="checkbox" 
+                                           wire:model="settings.required_customer_fields.address"
+                                           class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    <span class="text-sm text-gray-600 dark:text-gray-400">🏠 Address</span>
+                                </label>
+                                <label class="flex items-center space-x-2">
+                                    <input type="checkbox" 
+                                           wire:model="settings.required_customer_fields.city"
+                                           class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    <span class="text-sm text-gray-600 dark:text-gray-400">🏙️ City</span>
+                                </label>
+                                <label class="flex items-center space-x-2">
+                                    <input type="checkbox" 
+                                           wire:model="settings.required_customer_fields.email"
+                                           class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    <span class="text-sm text-gray-600 dark:text-gray-400">📧 Email</span>
+                                </label>
+                                <label class="flex items-center space-x-2">
+                                    <input type="checkbox" 
+                                           wire:model="settings.required_customer_fields.notes"
+                                           class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    <span class="text-sm text-gray-600 dark:text-gray-400">📝 Special Notes</span>
+                                </label>
+                            </div>
+                        </div>
+                    @endif
                 </div>
+            </div>
+        </div>
+
+        <!-- Payment Methods Settings -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Payment Methods & Responses</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">Configure which payment methods to offer and customize the response message for each method.</p>
+            
+            <div class="space-y-6">
+                @foreach($availablePaymentMethods as $method => $label)
+                    <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                        <!-- Payment Method Toggle -->
+                        <div class="flex items-center space-x-3 mb-3">
+                            <input type="checkbox" 
+                                   wire:model="settings.enabled_payment_methods.{{ $method }}"
+                                   id="payment_{{ $method }}"
+                                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <label for="payment_{{ $method }}" class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ $label }}
+                            </label>
+                        </div>
+                        
+                        <!-- Custom Response (shown only if enabled) -->
+                        @if($settings['enabled_payment_methods'][$method] ?? false)
+                            <div class="ml-6">
+                                <label for="response_{{ $method }}" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                                    Custom Response Message
+                                </label>
+                                <textarea wire:model="settings.payment_method_responses.{{ $method }}"
+                                          id="response_{{ $method }}"
+                                          rows="3"
+                                          class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                          placeholder="Enter the message customers will see when they select this payment method..."></textarea>
+                                <p class="text-xs text-gray-500 mt-1">This message will be sent to customers when they choose {{ $label }}.</p>
+                                @error('settings.payment_method_responses.' . $method) 
+                                    <span class="text-red-500 text-xs">{{ $message }}</span> 
+                                @enderror
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
             </div>
         </div>
 
