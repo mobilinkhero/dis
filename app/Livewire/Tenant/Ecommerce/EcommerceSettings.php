@@ -228,7 +228,8 @@ class EcommerceSettings extends Component
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::error('Validation failed', ['errors' => $e->errors()]);
-            $this->notify(['type' => 'danger', 'message' => 'Validation failed: ' . implode(', ', array_flatten($e->errors()))]);
+            $errorMessages = collect($e->errors())->flatten()->implode(', ');
+            $this->notify(['type' => 'danger', 'message' => 'Validation failed: ' . $errorMessages]);
         } catch (\Exception $e) {
             \Log::error('Save settings failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             $this->notify(['type' => 'danger', 'message' => 'Error updating settings: ' . $e->getMessage()]);
