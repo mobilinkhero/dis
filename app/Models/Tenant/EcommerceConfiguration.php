@@ -34,27 +34,6 @@ class EcommerceConfiguration extends BaseModel
         'sync_status',
         'last_sync_at',
         'configuration_completed_at',
-        
-        // AI Integration Settings
-        'ai_enabled',
-        'ai_provider',
-        'ai_api_key',
-        'ai_model',
-        'ai_temperature',
-        'ai_max_tokens',
-        'ai_system_prompt',
-        'ai_product_context',
-        'ai_conversation_memory',
-        'ai_product_recommendations',
-        'ai_order_processing',
-        'ai_customer_support',
-        'ai_inventory_alerts',
-        'ai_response_timeout',
-        'ai_fallback_to_manual',
-        'ai_fallback_message',
-        'ai_requests_count',
-        'ai_success_rate',
-        'ai_last_used_at',
     ];
 
     protected $casts = [
@@ -66,25 +45,9 @@ class EcommerceConfiguration extends BaseModel
         'abandoned_cart_settings' => 'json',
         'upselling_settings' => 'json',
         'ai_recommendations_enabled' => 'bool',
-        'sync_status' => 'string',
+        'tax_rate' => 'decimal:2',
         'last_sync_at' => 'datetime',
         'configuration_completed_at' => 'datetime',
-        
-        // AI Settings Casts
-        'ai_enabled' => 'bool',
-        'ai_temperature' => 'decimal:2',
-        'ai_max_tokens' => 'int',
-        'ai_conversation_memory' => 'json',
-        'ai_product_recommendations' => 'bool',
-        'ai_order_processing' => 'bool',
-        'ai_customer_support' => 'bool',
-        'ai_inventory_alerts' => 'bool',
-        'ai_response_timeout' => 'int',
-        'ai_fallback_to_manual' => 'bool',
-        'ai_requests_count' => 'int',
-        'ai_success_rate' => 'decimal:2',
-        'ai_last_used_at' => 'datetime',
-        'tax_rate' => 'decimal:2',
     ];
 
     /**

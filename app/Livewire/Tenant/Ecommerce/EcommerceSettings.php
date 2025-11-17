@@ -41,32 +41,8 @@ class EcommerceSettings extends Component
             'enabled' => false,
             'free_shipping_threshold' => 0,
             'default_shipping_cost' => 0
-        ],
-        // AI Settings
-        'ai_enabled' => false,
-        'ai_provider' => 'openai',
-        'ai_api_key' => '',
-        'ai_model' => 'gpt-3.5-turbo',
-        'ai_temperature' => 0.7,
-        'ai_max_tokens' => 1000,
-        'ai_system_prompt' => '',
-        'ai_product_recommendations' => true,
-        'ai_order_processing' => true,
-        'ai_customer_support' => true,
-        'ai_response_timeout' => 30,
-        'ai_fallback_message' => 'I apologize, but I\'m temporarily unavailable. A human agent will assist you shortly.'
-    ];
-
-    public $availableAiModels = [
-        'openai' => [
-            ['id' => 'gpt-3.5-turbo', 'name' => 'GPT-3.5 Turbo (Fast & Cost-effective)'],
-            ['id' => 'gpt-4', 'name' => 'GPT-4 (Most Capable)'],
-            ['id' => 'gpt-4-turbo', 'name' => 'GPT-4 Turbo (Balanced)'],
         ]
     ];
-
-    public $testingApiKey = false;
-    public $apiKeyTestResult = '';
 
     public $availablePaymentMethods = [
         'cash_on_delivery' => 'Cash on Delivery',
@@ -104,20 +80,6 @@ class EcommerceSettings extends Component
         'settings.shipping_settings.enabled' => 'boolean',
         'settings.shipping_settings.free_shipping_threshold' => 'required_if:settings.shipping_settings.enabled,true|numeric|min:0',
         'settings.shipping_settings.default_shipping_cost' => 'required_if:settings.shipping_settings.enabled,true|numeric|min:0',
-        
-        // AI Settings Validation (relaxed for debugging)
-        'settings.ai_enabled' => 'boolean',
-        'settings.ai_provider' => 'nullable|string',
-        'settings.ai_api_key' => 'nullable|string',
-        'settings.ai_model' => 'nullable|string',
-        'settings.ai_temperature' => 'nullable|numeric|min:0|max:1',
-        'settings.ai_max_tokens' => 'nullable|integer|min:100|max:4000',
-        'settings.ai_system_prompt' => 'nullable|string|max:2000',
-        'settings.ai_product_recommendations' => 'boolean',
-        'settings.ai_order_processing' => 'boolean',
-        'settings.ai_customer_support' => 'boolean',
-        'settings.ai_response_timeout' => 'nullable|integer|min:5|max:120',
-        'settings.ai_fallback_message' => 'nullable|string|max:500',
     ];
 
     public function mount()
@@ -143,20 +105,6 @@ class EcommerceSettings extends Component
                 'order_confirmation_message' => $this->config->order_confirmation_message ?? $this->getDefaultOrderMessage(),
                 'payment_confirmation_message' => $this->config->payment_confirmation_message ?? $this->getDefaultPaymentMessage(),
                 'ai_recommendations_enabled' => $this->config->ai_recommendations_enabled ?? true,
-                
-                // AI Settings
-                'ai_enabled' => $this->config->ai_enabled ?? false,
-                'ai_provider' => $this->config->ai_provider ?? 'openai',
-                'ai_api_key' => $this->config->ai_api_key ?? '',
-                'ai_model' => $this->config->ai_model ?? 'gpt-3.5-turbo',
-                'ai_temperature' => $this->config->ai_temperature ?? 0.7,
-                'ai_max_tokens' => $this->config->ai_max_tokens ?? 1000,
-                'ai_system_prompt' => $this->config->ai_system_prompt ?? $this->getDefaultSystemPrompt(),
-                'ai_product_recommendations' => $this->config->ai_product_recommendations ?? true,
-                'ai_order_processing' => $this->config->ai_order_processing ?? true,
-                'ai_customer_support' => $this->config->ai_customer_support ?? true,
-                'ai_response_timeout' => $this->config->ai_response_timeout ?? 30,
-                'ai_fallback_message' => $this->config->ai_fallback_message ?? 'I apologize, but I\'m temporarily unavailable. A human agent will assist you shortly.',
                 'abandoned_cart_settings' => $this->config->abandoned_cart_settings ?? [
                     'enabled' => false,
                     'delay_hours' => 24,
@@ -178,22 +126,15 @@ class EcommerceSettings extends Component
 
     public function saveSettings()
     {
+        $this->validate();
+
         try {
-            // Add debugging
-            \Log::info('Saving AI settings', [
-                'ai_enabled' => $this->settings['ai_enabled'] ?? 'not_set',
-                'ai_api_key' => isset($this->settings['ai_api_key']) ? 'SET' : 'NOT_SET',
-                'ai_model' => $this->settings['ai_model'] ?? 'not_set'
-            ]);
-
-            $this->validate();
-
             if (!$this->config) {
                 $this->notify(['type' => 'danger', 'message' => 'Please complete e-commerce setup first']);
                 return redirect()->to(tenant_route('tenant.ecommerce.setup'));
             }
 
-            $updateData = [
+            $this->config->update([
                 'currency' => $this->settings['currency'],
                 'tax_rate' => (float) $this->settings['tax_rate'],
                 'payment_methods' => $this->settings['payment_methods'],
@@ -203,99 +144,11 @@ class EcommerceSettings extends Component
                 'abandoned_cart_settings' => $this->settings['abandoned_cart_settings'],
                 'upselling_settings' => $this->settings['upselling_settings'],
                 'shipping_settings' => $this->settings['shipping_settings'],
-                
-                // AI Settings
-                'ai_enabled' => $this->settings['ai_enabled'] ?? false,
-                'ai_provider' => $this->settings['ai_provider'] ?? 'openai',
-                'ai_api_key' => $this->settings['ai_api_key'] ?? '',
-                'ai_model' => $this->settings['ai_model'] ?? 'gpt-3.5-turbo',
-                'ai_temperature' => (float) ($this->settings['ai_temperature'] ?? 0.7),
-                'ai_max_tokens' => (int) ($this->settings['ai_max_tokens'] ?? 1000),
-                'ai_system_prompt' => $this->settings['ai_system_prompt'] ?? '',
-                'ai_product_recommendations' => $this->settings['ai_product_recommendations'] ?? true,
-                'ai_order_processing' => $this->settings['ai_order_processing'] ?? true,
-                'ai_customer_support' => $this->settings['ai_customer_support'] ?? true,
-                'ai_response_timeout' => (int) ($this->settings['ai_response_timeout'] ?? 30),
-                'ai_fallback_message' => $this->settings['ai_fallback_message'] ?? '',
-            ];
+            ]);
 
-            \Log::info('Updating config with data', $updateData);
-            
-            $this->config->update($updateData);
-
-            \Log::info('Settings saved successfully');
-            $this->notify(['type' => 'success', 'message' => 'E-commerce settings updated successfully including AI configuration!']);
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            \Log::error('Validation failed', ['errors' => $e->errors()]);
-            $errorMessages = collect($e->errors())->flatten()->implode(', ');
-            $this->notify(['type' => 'danger', 'message' => 'Validation failed: ' . $errorMessages]);
+            $this->notify(['type' => 'success', 'message' => 'E-commerce settings updated successfully']);
         } catch (\Exception $e) {
-            \Log::error('Save settings failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             $this->notify(['type' => 'danger', 'message' => 'Error updating settings: ' . $e->getMessage()]);
-        }
-    }
-
-    public function saveAiSettings()
-    {
-        try {
-            \Log::info('Saving AI settings only', [
-                'ai_enabled' => $this->settings['ai_enabled'] ?? 'not_set',
-                'ai_api_key' => isset($this->settings['ai_api_key']) ? 'SET' : 'NOT_SET',
-                'ai_model' => $this->settings['ai_model'] ?? 'not_set'
-            ]);
-
-            // Validate only AI settings
-            $this->validate([
-                'settings.ai_enabled' => 'boolean',
-                'settings.ai_provider' => 'nullable|string',
-                'settings.ai_api_key' => 'nullable|string',
-                'settings.ai_model' => 'nullable|string',
-                'settings.ai_temperature' => 'nullable|numeric|min:0|max:1',
-                'settings.ai_max_tokens' => 'nullable|integer|min:100|max:4000',
-                'settings.ai_system_prompt' => 'nullable|string|max:2000',
-                'settings.ai_product_recommendations' => 'boolean',
-                'settings.ai_order_processing' => 'boolean',
-                'settings.ai_customer_support' => 'boolean',
-                'settings.ai_response_timeout' => 'nullable|integer|min:5|max:120',
-                'settings.ai_fallback_message' => 'nullable|string|max:500',
-            ]);
-
-            if (!$this->config) {
-                $this->notify(['type' => 'danger', 'message' => 'Please complete e-commerce setup first']);
-                return redirect()->to(tenant_route('tenant.ecommerce.setup'));
-            }
-
-            // Update only AI settings
-            $aiData = [
-                'ai_enabled' => $this->settings['ai_enabled'] ?? false,
-                'ai_provider' => $this->settings['ai_provider'] ?? 'openai',
-                'ai_api_key' => $this->settings['ai_api_key'] ?? '',
-                'ai_model' => $this->settings['ai_model'] ?? 'gpt-3.5-turbo',
-                'ai_temperature' => (float) ($this->settings['ai_temperature'] ?? 0.7),
-                'ai_max_tokens' => (int) ($this->settings['ai_max_tokens'] ?? 1000),
-                'ai_system_prompt' => $this->settings['ai_system_prompt'] ?? '',
-                'ai_product_recommendations' => $this->settings['ai_product_recommendations'] ?? true,
-                'ai_order_processing' => $this->settings['ai_order_processing'] ?? true,
-                'ai_customer_support' => $this->settings['ai_customer_support'] ?? true,
-                'ai_response_timeout' => (int) ($this->settings['ai_response_timeout'] ?? 30),
-                'ai_fallback_message' => $this->settings['ai_fallback_message'] ?? '',
-            ];
-
-            \Log::info('Updating AI config only', $aiData);
-            
-            $this->config->update($aiData);
-
-            \Log::info('AI settings saved successfully');
-            $this->notify(['type' => 'success', 'message' => '🤖 AI settings saved successfully! Your ChatGPT integration is now configured.']);
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            \Log::error('AI validation failed', ['errors' => $e->errors()]);
-            $errorMessages = collect($e->errors())->flatten()->implode(', ');
-            $this->notify(['type' => 'danger', 'message' => 'AI validation failed: ' . $errorMessages]);
-        } catch (\Exception $e) {
-            \Log::error('Save AI settings failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            $this->notify(['type' => 'danger', 'message' => 'Error saving AI settings: ' . $e->getMessage()]);
         }
     }
 
@@ -322,20 +175,7 @@ class EcommerceSettings extends Component
                 'enabled' => false,
                 'free_shipping_threshold' => 0,
                 'default_shipping_cost' => 0
-            ],
-            // AI Settings Defaults
-            'ai_enabled' => false,
-            'ai_provider' => 'openai',
-            'ai_api_key' => '',
-            'ai_model' => 'gpt-3.5-turbo',
-            'ai_temperature' => 0.7,
-            'ai_max_tokens' => 1000,
-            'ai_system_prompt' => $this->getDefaultSystemPrompt(),
-            'ai_product_recommendations' => true,
-            'ai_order_processing' => true,
-            'ai_customer_support' => true,
-            'ai_response_timeout' => 30,
-            'ai_fallback_message' => 'I apologize, but I\'m temporarily unavailable. A human agent will assist you shortly.'
+            ]
         ];
 
         $this->notify(['type' => 'info', 'message' => 'Settings reset to defaults']);
@@ -505,83 +345,11 @@ class EcommerceSettings extends Component
         return "🔥 Special Offer! Since you're ordering {current_items}, how about adding {recommended_item} for just {additional_cost} more? Perfect combo!";
     }
 
-    public function testApiKey()
-    {
-        if (!$this->settings['ai_api_key']) {
-            $this->notify(['type' => 'danger', 'message' => 'Please enter an API key first.']);
-            return;
-        }
-
-        $this->testingApiKey = true;
-        $this->apiKeyTestResult = '';
-
-        try {
-            $response = \Illuminate\Support\Facades\Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->settings['ai_api_key'],
-                'Content-Type' => 'application/json',
-            ])
-            ->timeout(10)
-            ->post('https://api.openai.com/v1/chat/completions', [
-                'model' => $this->settings['ai_model'],
-                'messages' => [
-                    ['role' => 'user', 'content' => 'Hello, this is a test message.']
-                ],
-                'max_tokens' => 50,
-            ]);
-
-            if ($response->successful()) {
-                $this->apiKeyTestResult = 'success';
-                $this->notify([
-                    'type' => 'success',
-                    'message' => '✅ API key is working! AI assistant is ready.'
-                ]);
-            } else {
-                $this->apiKeyTestResult = 'error';
-                $this->notify([
-                    'type' => 'danger',
-                    'message' => '❌ API key test failed: ' . $response->body()
-                ]);
-            }
-
-        } catch (\Exception $e) {
-            $this->apiKeyTestResult = 'error';
-            $this->notify([
-                'type' => 'danger',
-                'message' => '❌ API key test failed: ' . $e->getMessage()
-            ]);
-        } finally {
-            $this->testingApiKey = false;
-        }
-    }
-
-    protected function getDefaultSystemPrompt()
-    {
-        return "You are a helpful e-commerce assistant for a WhatsApp store. Your goals:
-
-1. Help customers find and learn about products
-2. Process orders efficiently and accurately  
-3. Provide excellent customer service
-4. Keep responses friendly, concise, and helpful
-
-When showing products:
-- Include name, price, description, and stock status
-- For single products, end with [BUTTONS:product_id] to show Buy Now/Add to Cart buttons
-- Use emojis to make messages engaging
-
-For orders:
-- Collect: product, quantity, payment method, delivery address
-- Confirm details before processing
-- End with [ORDER:product_id:quantity] when ready to create order
-
-Always be polite, professional, and focus on helping the customer make the best choice for their needs.";
-    }
-
     public function render()
     {
         return view('livewire.tenant.ecommerce.settings', [
             'availablePaymentMethods' => $this->availablePaymentMethods,
             'availableCurrencies' => $this->availableCurrencies,
-            'availableAiModels' => $this->availableAiModels,
         ]);
     }
 }

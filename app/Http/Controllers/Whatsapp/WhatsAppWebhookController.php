@@ -251,37 +251,29 @@ class WhatsAppWebhookController extends Controller
                             $ecommerceService = new EcommerceOrderService($this->tenant_id);
                             $ecommerceResult = $ecommerceService->processMessage($trigger_msg, $contact_data);
                             
-                            EcommerceLogger::info('Ecommerce result check', [
-                                'tenant_id' => $this->tenant_id,
-                                'handled' => $ecommerceResult['handled'] ?? 'not_set',
-                                'response' => $ecommerceResult['response'] ?? 'not_set',
-                                'response_length' => isset($ecommerceResult['response']) ? strlen($ecommerceResult['response']) : 0,
-                                'has_buttons' => !empty($ecommerceResult['buttons'])
-                            ]);
-                            
                             if ($ecommerceResult['handled'] && $ecommerceResult['response']) {
                                 EcommerceLogger::botInteraction(
                                     $contact_number, 
                                     $trigger_msg, 
                                     $ecommerceResult['response'],
-                                    $this->tenant_id,
-                                    'WhatsApp Webhook'
+                                    ['source' => 'WhatsApp Webhook']
                                 );
 
                                 // Send e-commerce response
                                 $ecommerceMessage = [
-                                    'id' => uniqid('ecommerce_'),
                                     'type' => 'text',
                                     'message' => $ecommerceResult['response'],
                                     'reply_text' => $ecommerceResult['response'],
                                     'bot_header' => '',
                                     'bot_footer' => '',
-                                    'rel_type' => 'contact',
+                                    'rel_type' => $contact_data->type ?? 'lead',
                                     'rel_id' => $contact_data->id,
                                     'tenant_id' => $this->tenant_id,
                                     'sending_count' => 0,
-                                    'filename' => ''
+                                    'filename' => '',
                                 ];
+                                
+                                // Add interactive buttons if provided
                                 try {
                                     if (!empty($ecommerceResult['buttons'])) {
                                         EcommerceLogger::info('Sending message with interactive buttons', [
@@ -316,17 +308,10 @@ class WhatsAppWebhookController extends Controller
                                     } else {
                                         EcommerceLogger::info('Sending message without buttons', [
                                             'tenant_id' => $this->tenant_id,
-                                            'phone' => $contact_number,
-                                            'message_data' => $ecommerceMessage
+                                            'phone' => $contact_number
                                         ]);
                                         
                                         $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $ecommerceMessage, $metadata['phone_number_id']);
-                                        
-                                        EcommerceLogger::info('WhatsApp send response', [
-                                            'tenant_id' => $this->tenant_id,
-                                            'phone' => $contact_number,
-                                            'response' => $response
-                                        ]);
                                     }
                                     
                                     $chatId = $this->createOrUpdateInteraction(
