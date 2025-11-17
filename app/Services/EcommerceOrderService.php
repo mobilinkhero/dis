@@ -176,11 +176,88 @@ Return JSON format:
      */
     protected function fallbackIntentDetection(string $message): array
     {
-        $message = strtolower($message);
+        $messageLower = strtolower($message);
         
+        // First, check if message mentions a specific product or category
+        $products = Product::where('tenant_id', $this->tenantId)
+            ->where('status', 'active')
+            ->get(['name', 'category']);
+        
+        // Split message into words for better matching
+        $messageWords = preg_split('/\s+/', $messageLower);
+        
+        foreach ($products as $product) {
+            $productNameLower = strtolower($product->name);
+            $categoryLower = strtolower($product->category ?? '');
+            
+            // Split product name into words
+            $productWords = preg_split('/\s+/', $productNameLower);
+            
+            // Check for exact product name match
+            if (strpos($messageLower, $productNameLower) !== false) {
+                // Determine if they want to buy or just inquire
+                if (preg_match('/\b(i want|buy|purchase|order|get me|add)\b/i', $message)) {
+                    return [
+                        'type' => 'add_to_cart',
+                        'confidence' => 0.9,
+                        'extracted_data' => [
+                            'product_name' => $product->name,
+                            'category' => $product->category
+                        ]
+                    ];
+                } else {
+                    return [
+                        'type' => 'product_inquiry',
+                        'confidence' => 0.85,
+                        'extracted_data' => [
+                            'product_name' => $product->name,
+                            'category' => $product->category
+                        ]
+                    ];
+                }
+            }
+            
+            // Check for partial word matches (at least 2 words match)
+            $matchCount = 0;
+            foreach ($productWords as $productWord) {
+                if (strlen($productWord) > 3) { // Only check meaningful words
+                    foreach ($messageWords as $messageWord) {
+                        if (strlen($messageWord) > 3 && 
+                            (strpos($messageWord, $productWord) !== false || 
+                             strpos($productWord, $messageWord) !== false)) {
+                            $matchCount++;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if ($matchCount >= 2 || ($matchCount >= 1 && count($productWords) <= 2)) {
+                return [
+                    'type' => 'product_inquiry',
+                    'confidence' => 0.75,
+                    'extracted_data' => [
+                        'product_name' => $product->name,
+                        'category' => $product->category
+                    ]
+                ];
+            }
+            
+            // Check category match
+            if ($categoryLower && strpos($messageLower, $categoryLower) !== false) {
+                return [
+                    'type' => 'product_inquiry',
+                    'confidence' => 0.7,
+                    'extracted_data' => [
+                        'category' => $product->category
+                    ]
+                ];
+            }
+        }
+        
+        // Then check for specific intents
         $patterns = [
-            'browse_products' => ['shop', 'catalog', 'products', 'show me', 'what do you have', 'browse', 'menu', 'store', 'buy'],
-            'add_to_cart' => ['add', 'purchase', 'i want', 'get me', 'take'],
+            'browse_products' => ['shop', 'catalog', 'products', 'show me all', 'what do you have', 'browse', 'menu', 'store'],
             'view_cart' => ['cart', 'my order', 'what did i order', 'check order', 'my cart'],
             'checkout' => ['checkout', 'confirm order', 'place order', 'proceed', 'pay', 'complete'],
             'order_status' => ['status', 'where is my order', 'tracking', 'delivered', 'order status'],
@@ -189,7 +266,7 @@ Return JSON format:
 
         foreach ($patterns as $intent => $keywords) {
             foreach ($keywords as $keyword) {
-                if (strpos($message, $keyword) !== false) {
+                if (strpos($messageLower, $keyword) !== false) {
                     return [
                         'type' => $intent,
                         'confidence' => 0.7,
@@ -199,6 +276,7 @@ Return JSON format:
             }
         }
 
+        // If no specific intent found, return unknown for AI handling
         return [
             'type' => 'unknown',
             'confidence' => 0.0,
