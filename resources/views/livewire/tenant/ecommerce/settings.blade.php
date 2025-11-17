@@ -109,16 +109,157 @@
             </div>
         </div>
 
-        <!-- AI & Automation Settings -->
+        <!-- AI Assistant Settings -->
         <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">AI & Automation</h3>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                🤖 AI Assistant Settings
+            </h3>
+            
+            <!-- AI Enable Toggle -->
+            <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800 mb-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-900 dark:text-white">Enable AI Assistant</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Turn on ChatGPT for automated customer service</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" wire:model.live="settings.ai_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+            </div>
+
+            @if($settings['ai_enabled'])
+            <div class="space-y-4">
+                <!-- API Configuration -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">AI Model</label>
+                        <select wire:model="settings.ai_model" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                            @foreach($availableAiModels['openai'] ?? [] as $model)
+                            <option value="{{ $model['id'] }}">{{ $model['name'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Response Timeout (seconds)</label>
+                        <input type="number" wire:model="settings.ai_response_timeout" min="5" max="120" 
+                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                    </div>
+                </div>
+
+                <!-- API Key -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">OpenAI API Key</label>
+                    <div class="flex space-x-3">
+                        <input type="password" wire:model="settings.ai_api_key" 
+                               placeholder="sk-..." 
+                               class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                        <button type="button" wire:click="testApiKey" 
+                                wire:loading.attr="disabled"
+                                class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition disabled:opacity-50">
+                            <span wire:loading.remove wire:target="testApiKey">🧪 Test</span>
+                            <span wire:loading wire:target="testApiKey">Testing...</span>
+                        </button>
+                    </div>
+                    @if($apiKeyTestResult === 'success')
+                        <p class="text-sm text-green-600 mt-1">✅ API key is working!</p>
+                    @elseif($apiKeyTestResult === 'error')
+                        <p class="text-sm text-red-600 mt-1">❌ API key test failed</p>
+                    @endif
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Get your API key from: 
+                        <a href="https://platform.openai.com/api-keys" target="_blank" class="text-blue-500 hover:text-blue-600">OpenAI Platform</a>
+                    </p>
+                </div>
+
+                <!-- AI Parameters -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Temperature ({{ $settings['ai_temperature'] }})</label>
+                        <input type="range" wire:model.live="settings.ai_temperature" min="0" max="1" step="0.1" 
+                               class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700">
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>Focused</span>
+                            <span>Creative</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Tokens</label>
+                        <input type="number" wire:model="settings.ai_max_tokens" min="100" max="4000" 
+                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Response length limit</p>
+                    </div>
+                </div>
+
+                <!-- System Prompt -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">AI System Prompt</label>
+                    <textarea wire:model="settings.ai_system_prompt" rows="6" 
+                              class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                              placeholder="Instructions for how the AI should behave..."></textarea>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Define how your AI assistant should behave and respond to customers</p>
+                </div>
+
+                <!-- AI Features -->
+                <div class="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
+                    <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">AI Features</h4>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" wire:model="settings.ai_product_recommendations" 
+                                   class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200">
+                            <span class="text-sm text-gray-900 dark:text-white">Product Recommendations</span>
+                        </label>
+
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" wire:model="settings.ai_order_processing" 
+                                   class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200">
+                            <span class="text-sm text-gray-900 dark:text-white">Order Processing</span>
+                        </label>
+
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" wire:model="settings.ai_customer_support" 
+                                   class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200">
+                            <span class="text-sm text-gray-900 dark:text-white">Customer Support</span>
+                        </label>
+
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" wire:model="settings.ai_recommendations_enabled" 
+                                   class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200">
+                            <span class="text-sm text-gray-900 dark:text-white">Smart Recommendations</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Fallback Message -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Fallback Message</label>
+                    <textarea wire:model="settings.ai_fallback_message" rows="3" 
+                              class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                              placeholder="Message to show when AI is unavailable..."></textarea>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Message shown when AI fails or is unavailable</p>
+                </div>
+            </div>
+            @else
+            <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+                <p class="text-sm">Enable AI Assistant to configure ChatGPT integration</p>
+                <p class="text-xs mt-2">Transform your e-commerce bot with intelligent customer service</p>
+            </div>
+            @endif
+        </div>
+
+        <!-- Legacy AI Settings (kept for compatibility) -->
+        @if(!$settings['ai_enabled'])
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Manual Automation (Legacy)</h3>
             
             <div class="space-y-4">
                 <!-- AI Recommendations -->
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-700 dark:text-gray-300">AI Product Recommendations</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Suggest related products to customers</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Basic rule-based product suggestions</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" wire:model="settings.ai_recommendations_enabled" class="sr-only peer">
