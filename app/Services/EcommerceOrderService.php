@@ -74,7 +74,7 @@ class EcommerceOrderService
             );
             
             // Check for advanced button clicks (quantity, confirm, payment)
-            if (preg_match('/^(qty_1|qty_2|qty_custom|confirm_order|payment_cod|payment_bank|payment_card)_(\d+)$/', $message, $matches)) {
+            if (preg_match('/^(qty_1|qty_2|qty_custom|confirm_order|payment_cod|payment_bank|payment_card|payment_online)_(\d+)$/', $message, $matches)) {
                 return $this->handleAdvancedButtonClick($matches[1], $matches[2]);
             }
             
@@ -1033,6 +1033,9 @@ Don't make up specific products or prices. Focus on being helpful and guiding th
             case 'payment_card':
                 return $this->handlePaymentMethodSelected('Credit/Debit Card');
             
+            case 'payment_online':
+                return $this->handlePaymentMethodSelected('Online Payment');
+            
             default:
                 return [
                     'handled' => true,
@@ -1049,6 +1052,9 @@ Don't make up specific products or prices. Focus on being helpful and guiding th
         switch ($this->currentSession->current_step) {
             case 'awaiting_custom_qty':
                 return $this->handleCustomQuantityInput($message);
+            
+            case 'customer_details':
+                return $this->handleCustomerDetailsInput($message);
             
             case 'payment_selection':
                 return $this->handlePaymentSelection($message);
@@ -1137,6 +1143,86 @@ Don't make up specific products or prices. Focus on being helpful and guiding th
     }
 
     /**
+     * Handle customer details input
+     */
+    protected function handleCustomerDetailsInput(string $message): array
+    {
+        $lines = explode("\n", trim($message));
+        $requiredFields = $this->config->getRequiredCustomerFields();
+        
+        // Count required fields to validate input
+        $expectedLineCount = 0;
+        if ($requiredFields['name']) $expectedLineCount++;
+        if ($requiredFields['phone']) $expectedLineCount++;
+        if ($requiredFields['address']) $expectedLineCount++;
+        if ($requiredFields['city']) $expectedLineCount++;
+        if ($requiredFields['email']) $expectedLineCount++;
+        if ($requiredFields['notes']) $expectedLineCount++;
+        
+        if (count($lines) < $expectedLineCount) {
+            $response = "❌ *Incomplete Details*\n\n";
+            $response .= "Please provide all required information in separate lines:\n\n";
+            
+            $fieldsText = [];
+            if ($requiredFields['name']) $fieldsText[] = "👤 Full Name";
+            if ($requiredFields['phone']) $fieldsText[] = "📱 Phone Number";
+            if ($requiredFields['address']) $fieldsText[] = "🏠 Complete Address";
+            if ($requiredFields['city']) $fieldsText[] = "🏙️ City";
+            if ($requiredFields['email']) $fieldsText[] = "📧 Email Address";
+            if ($requiredFields['notes']) $fieldsText[] = "📝 Special Instructions";
+            
+            $response .= "*Required:*\n" . implode("\n", $fieldsText) . "\n\n";
+            $response .= "Send each detail on a new line.";
+            
+            return [
+                'handled' => true,
+                'response' => $response
+            ];
+        }
+        
+        // Parse customer details
+        $customerDetails = [];
+        $lineIndex = 0;
+        
+        if ($requiredFields['name']) $customerDetails['name'] = $lines[$lineIndex++] ?? '';
+        if ($requiredFields['phone']) $customerDetails['phone'] = $lines[$lineIndex++] ?? '';
+        if ($requiredFields['address']) $customerDetails['address'] = $lines[$lineIndex++] ?? '';
+        if ($requiredFields['city']) $customerDetails['city'] = $lines[$lineIndex++] ?? '';
+        if ($requiredFields['email']) $customerDetails['email'] = $lines[$lineIndex++] ?? '';
+        if ($requiredFields['notes']) $customerDetails['notes'] = $lines[$lineIndex++] ?? '';
+        
+        // Store customer details in session
+        $this->currentSession->updateStep('customer_details_confirmed', [
+            'customer_details' => $customerDetails
+        ]);
+        
+        // Show confirmation and proceed to payment
+        $productId = $this->currentSession->getData('product_id');
+        
+        $response = "✅ *Details Confirmed!*\n\n";
+        $response .= "📝 *Customer Information:*\n";
+        
+        if (!empty($customerDetails['name'])) $response .= "👤 Name: {$customerDetails['name']}\n";
+        if (!empty($customerDetails['phone'])) $response .= "📱 Phone: {$customerDetails['phone']}\n";
+        if (!empty($customerDetails['address'])) $response .= "🏠 Address: {$customerDetails['address']}\n";
+        if (!empty($customerDetails['city'])) $response .= "🏙️ City: {$customerDetails['city']}\n";
+        if (!empty($customerDetails['email'])) $response .= "📧 Email: {$customerDetails['email']}\n";
+        if (!empty($customerDetails['notes'])) $response .= "📝 Notes: {$customerDetails['notes']}\n";
+        
+        $response .= "\n✅ Details saved successfully!\n\n";
+        $response .= "Now let's complete your payment...";
+        
+        // Show payment methods
+        $paymentResult = $this->showPaymentMethods($productId);
+        
+        return [
+            'handled' => true,
+            'response' => $response . "\n\n" . $paymentResult['response'],
+            'buttons' => $paymentResult['buttons'] ?? []
+        ];
+    }
+
+    /**
      * Generate detailed invoice
      */
     protected function generateInvoice(Product $product, int $quantity, float $totalPrice): string
@@ -1170,27 +1256,105 @@ Don't make up specific products or prices. Focus on being helpful and guiding th
      */
     protected function handleOrderConfirmation(int $productId): array
     {
+        // Check if customer details collection is enabled
+        if ($this->config && $this->config->shouldCollectCustomerDetails()) {
+            return $this->startCustomerDetailsCollection($productId);
+        }
+
+        // Skip to payment selection if details collection is disabled
+        return $this->showPaymentMethods($productId);
+    }
+
+    /**
+     * Start customer details collection
+     */
+    protected function startCustomerDetailsCollection(int $productId): array
+    {
+        $this->currentSession->updateStep('customer_details', []);
+        
+        $requiredFields = $this->config->getRequiredCustomerFields();
+        
+        $response = "📝 *Customer Details*\n\n";
+        $response .= "Please provide your details for delivery:\n\n";
+        
+        $fieldsText = [];
+        if ($requiredFields['name']) $fieldsText[] = "👤 Full Name";
+        if ($requiredFields['phone']) $fieldsText[] = "📱 Phone Number"; 
+        if ($requiredFields['address']) $fieldsText[] = "🏠 Complete Address";
+        if ($requiredFields['city']) $fieldsText[] = "🏙️ City";
+        if ($requiredFields['email']) $fieldsText[] = "📧 Email Address";
+        if ($requiredFields['notes']) $fieldsText[] = "📝 Special Instructions";
+        
+        $response .= "*Required:*\n" . implode("\n", $fieldsText) . "\n\n";
+        $response .= "Please send your details in this format:\n\n";
+        $response .= "*Example:*\n";
+        $response .= "John Doe\n";
+        $response .= "+1234567890\n";
+        $response .= "123 Main Street, Apt 4B\n";
+        if ($requiredFields['city']) $response .= "New York\n";
+        if ($requiredFields['email']) $response .= "john@example.com\n";
+        if ($requiredFields['notes']) $response .= "Ring doorbell twice\n";
+        
+        return [
+            'handled' => true,
+            'response' => $response
+        ];
+    }
+
+    /**
+     * Show payment methods based on tenant settings
+     */
+    protected function showPaymentMethods(int $productId): array
+    {
         $this->currentSession->updateStep('payment_selection', []);
+        
+        $enabledMethods = $this->config->getEnabledPaymentMethods();
+        $buttons = [];
+        
+        if ($enabledMethods['cod'] ?? false) {
+            $buttons[] = [
+                'id' => 'payment_cod_' . $productId,
+                'title' => '💵 Cash on Delivery'
+            ];
+        }
+        
+        if ($enabledMethods['bank_transfer'] ?? false) {
+            $buttons[] = [
+                'id' => 'payment_bank_' . $productId,
+                'title' => '🏦 Bank Transfer'
+            ];
+        }
+        
+        if ($enabledMethods['card'] ?? false) {
+            $buttons[] = [
+                'id' => 'payment_card_' . $productId,
+                'title' => '💳 Credit/Debit Card'
+            ];
+        }
+        
+        if ($enabledMethods['online'] ?? false) {
+            $buttons[] = [
+                'id' => 'payment_online_' . $productId,
+                'title' => '🌐 Online Payment'
+            ];
+        }
+        
+        // Fallback if no methods enabled
+        if (empty($buttons)) {
+            $buttons = [
+                [
+                    'id' => 'payment_cod_' . $productId,
+                    'title' => '💵 Cash on Delivery'
+                ]
+            ];
+        }
         
         return [
             'handled' => true,
             'response' => "🎉 *Order Confirmed!*\n\n" .
                          "Please select your preferred payment method:\n\n" .
                          "💳 Choose how you'd like to pay:",
-            'buttons' => [
-                [
-                    'id' => 'payment_cod_' . $productId,
-                    'title' => '💵 Cash on Delivery'
-                ],
-                [
-                    'id' => 'payment_bank_' . $productId,
-                    'title' => '🏦 Bank Transfer'
-                ],
-                [
-                    'id' => 'payment_card_' . $productId,
-                    'title' => '💳 Credit/Debit Card'
-                ]
-            ]
+            'buttons' => $buttons
         ];
     }
 
@@ -1235,18 +1399,32 @@ Don't make up specific products or prices. Focus on being helpful and guiding th
         $response .= "• Quantity: {$quantity} units\n";
         $response .= "• Total: $" . number_format($totalPrice, 2) . "\n\n";
         
-        if ($paymentMethod === 'Cash on Delivery') {
-            $response .= "💵 *Cash on Delivery*\n";
-            $response .= "Our delivery team will contact you within 24 hours to arrange delivery.\n";
-            $response .= "Please keep the exact cash amount ready.\n\n";
-        } elseif ($paymentMethod === 'Bank Transfer') {
-            $response .= "🏦 *Bank Transfer Details*\n";
-            $response .= "Account: 1234-5678-9012\n";
-            $response .= "Bank: ABC Bank\n";
-            $response .= "Please send us the transfer receipt.\n\n";
+        // Get tenant-configured payment method responses
+        $paymentResponses = $this->config->getPaymentMethodResponses();
+        
+        // Match payment method to response key
+        $responseKey = '';
+        switch ($paymentMethod) {
+            case 'Cash on Delivery':
+                $responseKey = 'cod';
+                break;
+            case 'Bank Transfer':
+                $responseKey = 'bank_transfer';
+                break;
+            case 'Credit/Debit Card':
+                $responseKey = 'card';
+                break;
+            case 'Online Payment':
+                $responseKey = 'online';
+                break;
+        }
+        
+        // Add payment-specific instructions
+        if (!empty($responseKey) && !empty($paymentResponses[$responseKey])) {
+            $response .= $paymentResponses[$responseKey] . "\n\n";
         } else {
-            $response .= "💳 *Card Payment*\n";
-            $response .= "Our team will send you a secure payment link shortly.\n\n";
+            // Fallback message
+            $response .= "Our team will contact you shortly with payment instructions.\n\n";
         }
         
         $response .= "📞 *Need Help?*\n";

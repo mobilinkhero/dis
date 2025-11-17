@@ -22,6 +22,10 @@ class EcommerceConfiguration extends BaseModel
         'products_sheet_id',
         'orders_sheet_id',
         'customers_sheet_id',
+        'required_customer_fields',
+        'enabled_payment_methods',
+        'payment_method_responses',
+        'collect_customer_details',
         'payment_methods',
         'currency',
         'tax_rate',
@@ -40,6 +44,10 @@ class EcommerceConfiguration extends BaseModel
         'tenant_id' => 'int',
         'is_configured' => 'bool',
         'google_sheets_enabled' => 'bool',
+        'required_customer_fields' => 'json',
+        'enabled_payment_methods' => 'json',
+        'payment_method_responses' => 'json',
+        'collect_customer_details' => 'bool',
         'payment_methods' => 'json',
         'shipping_settings' => 'json',
         'abandoned_cart_settings' => 'json',
@@ -107,5 +115,54 @@ class EcommerceConfiguration extends BaseModel
             'upsell_percentage' => 20,
             'max_recommendations' => 3
         ];
+    }
+
+    /**
+     * Get required customer fields with defaults
+     */
+    public function getRequiredCustomerFields(): array
+    {
+        return $this->required_customer_fields ?? [
+            'name' => true,
+            'phone' => true, 
+            'address' => true,
+            'city' => false,
+            'email' => false,
+            'notes' => false
+        ];
+    }
+
+    /**
+     * Get enabled payment methods with defaults  
+     */
+    public function getEnabledPaymentMethods(): array
+    {
+        return $this->enabled_payment_methods ?? [
+            'cod' => true,
+            'bank_transfer' => true,
+            'card' => false,
+            'online' => false
+        ];
+    }
+
+    /**
+     * Get payment method responses with defaults
+     */
+    public function getPaymentMethodResponses(): array
+    {
+        return $this->payment_method_responses ?? [
+            'cod' => "💵 *Cash on Delivery*\nOur delivery team will contact you within 24 hours.\nPlease keep exact cash amount ready.",
+            'bank_transfer' => "🏦 *Bank Transfer*\nAccount: 1234-5678-9012\nBank: ABC Bank\nPlease send us the transfer receipt.",
+            'card' => "💳 *Card Payment*\nOur team will send you a secure payment link shortly.",
+            'online' => "🌐 *Online Payment*\nRedirecting to secure payment gateway..."
+        ];
+    }
+
+    /**
+     * Check if customer details collection is enabled
+     */
+    public function shouldCollectCustomerDetails(): bool
+    {
+        return $this->collect_customer_details ?? true;
     }
 }
