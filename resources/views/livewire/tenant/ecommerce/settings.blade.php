@@ -239,6 +239,17 @@
                               placeholder="Message to show when AI is unavailable..."></textarea>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Message shown when AI fails or is unavailable</p>
                 </div>
+
+                <!-- AI Settings Save Button -->
+                <div class="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-600">
+                    <button wire:click="saveSettings" 
+                            wire:loading.attr="disabled"
+                            wire:loading.class="opacity-50"
+                            class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition flex items-center gap-2">
+                        <span wire:loading.remove wire:target="saveSettings">💾 Save AI Settings</span>
+                        <span wire:loading wire:target="saveSettings">Saving...</span>
+                    </button>
+                </div>
             </div>
             @else
             <div class="text-center py-8 text-gray-500 dark:text-gray-400">
