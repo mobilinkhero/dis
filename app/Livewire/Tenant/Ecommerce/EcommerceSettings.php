@@ -153,13 +153,46 @@ class EcommerceSettings extends Component
 
     public function saveSettings()
     {
-        $this->validate();
+        \Log::info('🔧 SaveSettings: Method called', [
+            'tenant_id' => tenant_id(),
+            'config_exists' => $this->config ? 'Yes' : 'No',
+            'settings_count' => count($this->settings ?? [])
+        ]);
+        
+        try {
+            \Log::info('🔧 SaveSettings: Before validation', [
+                'settings' => $this->settings
+            ]);
+            
+            $this->validate();
+            
+            \Log::info('🔧 SaveSettings: Validation passed');
+
+        } catch (\Exception $validationError) {
+            \Log::error('🔧 SaveSettings: Validation failed', [
+                'error' => $validationError->getMessage(),
+                'trace' => $validationError->getTraceAsString()
+            ]);
+            $this->notify(['type' => 'danger', 'message' => 'Validation error: ' . $validationError->getMessage()]);
+            return;
+        }
 
         try {
             if (!$this->config) {
+                \Log::warning('🔧 SaveSettings: No config found');
                 $this->notify(['type' => 'danger', 'message' => 'Please complete e-commerce setup first']);
                 return redirect()->to(tenant_route('tenant.ecommerce.setup'));
             }
+
+            \Log::info('🔧 SaveSettings: About to update config', [
+                'config_id' => $this->config->id,
+                'update_data' => [
+                    'currency' => $this->settings['currency'],
+                    'tax_rate' => (float) $this->settings['tax_rate'],
+                    'collect_customer_details' => $this->settings['collect_customer_details'],
+                    'enabled_payment_methods' => $this->settings['enabled_payment_methods'],
+                ]
+            ]);
 
             $this->config->update([
                 'currency' => $this->settings['currency'],
@@ -176,10 +209,26 @@ class EcommerceSettings extends Component
                 'shipping_settings' => $this->settings['shipping_settings'],
             ]);
 
+            \Log::info('🔧 SaveSettings: Config updated successfully');
             $this->notify(['type' => 'success', 'message' => 'E-commerce settings updated successfully']);
+            
         } catch (\Exception $e) {
+            \Log::error('🔧 SaveSettings: Database update failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'config_id' => $this->config ? $this->config->id : 'null',
+                'tenant_id' => tenant_id()
+            ]);
             $this->notify(['type' => 'danger', 'message' => 'Error updating settings: ' . $e->getMessage()]);
         }
+        
+        \Log::info('🔧 SaveSettings: Method completed');
+    }
+
+    public function testConnection()
+    {
+        \Log::info('🔧 TestConnection: Method called successfully');
+        $this->notify(['type' => 'info', 'message' => 'Livewire connection is working! Check logs for save issues.']);
     }
 
     public function resetToDefaults()

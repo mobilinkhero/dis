@@ -661,8 +661,13 @@
     @endif
 
     <!-- Bottom Save Button -->
-    <div class="mt-8 flex justify-center">
+    <div class="mt-8 flex justify-center space-x-4">
+        <button wire:click="testConnection" 
+                class="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
+            🔗 Test Connection
+        </button>
         <button wire:click="saveSettings" 
+                onclick="console.log('🔧 Save button clicked!'); console.log('Livewire component:', @this);"
                 class="px-8 py-3 bg-blue-600 text-white text-lg font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-lg">
             💾 Save All Settings
         </button>
