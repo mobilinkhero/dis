@@ -21,8 +21,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
-use Netflie\WhatsAppCloudApi\Message\OptionsList\Row;
-use Netflie\WhatsAppCloudApi\Message\OptionsList\Action;
+use Netflie\WhatsAppCloudApi\Message\ButtonReply\Button;
+use Netflie\WhatsAppCloudApi\Message\ButtonReply\ButtonAction;
 use stdClass;
 
 class WhatsAppWebhookController extends Controller
@@ -3291,28 +3291,33 @@ class WhatsAppWebhookController extends Controller
             ]);
 
             // Format buttons for WhatsApp API (max 3 buttons)
-            $rows = [];
+            $buttonRows = [];
             foreach (array_slice($buttons, 0, 3) as $button) {
-                $rows[] = new Row(
+                $buttonRows[] = new Button(
                     $button['id'],
-                    substr($button['title'], 0, 24) // Max 24 chars for title
+                    substr($button['title'], 0, 20) // Max 20 chars for button title
                 );
             }
             
-            $action = new Action('select_option', $rows);
+            $buttonAction = new ButtonAction($buttonRows);
 
-            $response = $whatsapp_cloud_api->sendList(
+            EcommerceLogger::info('Sending button message to WhatsApp', [
+                'tenant_id' => $this->tenant_id,
+                'phone' => $contactNumber,
+                'buttons_count' => count($buttonRows)
+            ]);
+
+            $response = $whatsapp_cloud_api->sendButton(
                 $contactNumber,
                 $bodyText,
-                'Options', // button text
-                [], // sections - we'll use action directly
-                $action
+                $buttonAction
             );
 
             EcommerceLogger::info('Interactive buttons sent successfully', [
                 'contact_number' => $contactNumber,
-                'buttons_count' => count($rows),
+                'buttons_count' => count($buttonRows),
                 'tenant_id' => $this->tenant_id,
+                'response' => $response
             ]);
 
             return $response;
@@ -3330,6 +3335,11 @@ class WhatsAppWebhookController extends Controller
                 $fallbackText .= ($index + 1) . ". " . $button['title'] . "\n";
             }
             $fallbackText .= "\nReply with the number or button text to proceed.";
+            
+            EcommerceLogger::info('Sending fallback text message', [
+                'tenant_id' => $this->tenant_id,
+                'phone' => $contactNumber
+            ]);
             
             return $this->setWaTenantId($this->tenant_id)->sendMessage($contactNumber, [
                 'type' => 'text',
