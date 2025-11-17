@@ -21,7 +21,6 @@ return new class extends Migration
             
             // Default settings
             $table->boolean('collect_customer_details')->default(true)->after('payment_method_responses');
-            $table->text('order_confirmation_message')->nullable()->after('collect_customer_details');
         });
     }
 
@@ -35,8 +34,7 @@ return new class extends Migration
                 'required_customer_fields',
                 'enabled_payment_methods', 
                 'payment_method_responses',
-                'collect_customer_details',
-                'order_confirmation_message'
+                'collect_customer_details'
             ]);
         });
     }
