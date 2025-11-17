@@ -659,4 +659,12 @@
             }
         </script>
     @endif
+
+    <!-- Bottom Save Button -->
+    <div class="mt-8 flex justify-center">
+        <button wire:click="saveSettings" 
+                class="px-8 py-3 bg-blue-600 text-white text-lg font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-lg">
+            💾 Save All Settings
+        </button>
+    </div>
 </div>
