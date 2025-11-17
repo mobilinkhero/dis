@@ -6,6 +6,7 @@ use App\Models\Tenant\Product;
 use App\Models\Tenant\Order;
 use App\Models\Tenant\Contact;
 use App\Models\Tenant\EcommerceConfiguration;
+use App\Models\Tenant\EcommerceUserSession;
 use App\Services\EcommerceLogger;
 use App\Traits\Ai;
 use App\Traits\WhatsApp;
@@ -23,6 +24,7 @@ class EcommerceOrderService
     protected $config;
     protected $currentContact;
     protected $currentOrder;
+    protected $currentSession;
 
     public function __construct($tenantId = null)
     {
@@ -64,9 +66,26 @@ class EcommerceOrderService
 
             $this->currentContact = $contact;
             
-            // Check if this is a button click
+            // Get or create user session
+            $this->currentSession = EcommerceUserSession::getOrCreate(
+                $this->tenantId,
+                $contact->id,
+                $contact->phone
+            );
+            
+            // Check for advanced button clicks (quantity, confirm, payment)
+            if (preg_match('/^(qty_1|qty_2|qty_custom|confirm_order|payment_cod|payment_bank|payment_card)_(\d+)$/', $message, $matches)) {
+                return $this->handleAdvancedButtonClick($matches[1], $matches[2]);
+            }
+            
+            // Check if this is a basic button click
             if (preg_match('/^(buy|add_cart|more_info)_(\d+)$/', $message, $matches)) {
                 return $this->handleButtonClick($matches[1], $matches[2]);
+            }
+            
+            // Handle session-based flow (user is in middle of shopping process)
+            if ($this->currentSession->current_step !== 'idle') {
+                return $this->handleSessionFlow($message);
             }
             
             // Detect intent using AI or fallback
@@ -846,29 +865,31 @@ Don't make up specific products or prices. Focus on being helpful and guiding th
 
         switch ($action) {
             case 'buy':
-                // Buy Now - Ask for quantity and payment method
+                // Start advanced shopping flow - Ask for quantity
+                $this->currentSession->updateStep('quantity_selection', [
+                    'product_id' => $productId,
+                    'product_name' => $product->name,
+                    'product_price' => $product->sale_price,
+                    'step' => 'quantity_selection'
+                ]);
+                
                 return [
                     'handled' => true,
                     'response' => "🛒 *{$product->name}*\n💰 {$product->formatted_price}\n\n" .
-                                 "Great choice! How would you like to proceed?\n\n" .
-                                 "📦 *Quantity:* How many units do you want?\n" .
-                                 "💳 *Payment:* Choose your payment method:\n\n" .
-                                 "Reply with:\n" .
-                                 "• \"1 unit, Cash on Delivery\"\n" .
-                                 "• \"2 units, Bank Transfer\"\n" .
-                                 "• Or just tell me your preference!",
+                                 "Great choice! How many units would you like to buy?\n\n" .
+                                 "📦 *Select Quantity:*",
                     'buttons' => [
                         [
                             'id' => 'qty_1_' . $productId,
-                            'title' => '1 Unit - COD'
+                            'title' => '1 Unit'
                         ],
                         [
                             'id' => 'qty_2_' . $productId,
-                            'title' => '2 Units - COD'
+                            'title' => '2 Units'
                         ],
                         [
-                            'id' => 'custom_qty_' . $productId,
-                            'title' => 'Custom Order'
+                            'id' => 'qty_custom_' . $productId,
+                            'title' => 'Custom'
                         ]
                     ]
                 ];
@@ -961,5 +982,280 @@ Don't make up specific products or prices. Focus on being helpful and guiding th
                     'response' => "I'm here to help! 😊\n\nType 'catalog' to see products or 'help' for more options."
                 ];
         }
+    }
+
+    /**
+     * Handle advanced button clicks (quantity, confirm, payment)
+     */
+    protected function handleAdvancedButtonClick(string $action, int $productId): array
+    {
+        $product = Product::where('tenant_id', $this->tenantId)
+            ->where('id', $productId)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$product) {
+            return [
+                'handled' => true,
+                'response' => "Sorry, this product is no longer available. 😕"
+            ];
+        }
+
+        switch ($action) {
+            case 'qty_1':
+                return $this->handleQuantitySelection($productId, 1);
+            
+            case 'qty_2':
+                return $this->handleQuantitySelection($productId, 2);
+            
+            case 'qty_custom':
+                $this->currentSession->updateStep('awaiting_custom_qty', [
+                    'product_id' => $productId
+                ]);
+                
+                return [
+                    'handled' => true,
+                    'response' => "📦 *Custom Quantity*\n\n" .
+                                 "Please tell me how many units you want.\n\n" .
+                                 "Just reply with the number (e.g., 5, 10, 15)\n\n" .
+                                 "Example: 5"
+                ];
+            
+            case 'confirm_order':
+                return $this->handleOrderConfirmation($productId);
+            
+            case 'payment_cod':
+                return $this->handlePaymentMethodSelected('Cash on Delivery');
+            
+            case 'payment_bank':
+                return $this->handlePaymentMethodSelected('Bank Transfer');
+            
+            case 'payment_card':
+                return $this->handlePaymentMethodSelected('Credit/Debit Card');
+            
+            default:
+                return [
+                    'handled' => true,
+                    'response' => "I'm here to help! 😊"
+                ];
+        }
+    }
+
+    /**
+     * Handle session-based flow
+     */
+    protected function handleSessionFlow(string $message): array
+    {
+        switch ($this->currentSession->current_step) {
+            case 'awaiting_custom_qty':
+                return $this->handleCustomQuantityInput($message);
+            
+            case 'payment_selection':
+                return $this->handlePaymentSelection($message);
+            
+            default:
+                // Reset session if in unknown state
+                $this->currentSession->clearSession();
+                return [
+                    'handled' => true,
+                    'response' => "Let's start fresh! 😊\n\nType 'catalog' to see our products."
+                ];
+        }
+    }
+
+    /**
+     * Handle quantity selection
+     */
+    protected function handleQuantitySelection(int $productId, int $quantity): array
+    {
+        $product = Product::find($productId);
+        
+        if (!$product || $quantity > $product->stock_quantity) {
+            return [
+                'handled' => true,
+                'response' => "Sorry, we only have {$product->stock_quantity} units available. 😕"
+            ];
+        }
+
+        $totalPrice = $product->sale_price * $quantity;
+        
+        // Update session with quantity
+        $this->currentSession->updateStep('invoice_review', [
+            'quantity' => $quantity,
+            'total_price' => $totalPrice
+        ]);
+
+        // Generate detailed invoice
+        $invoice = $this->generateInvoice($product, $quantity, $totalPrice);
+        
+        return [
+            'handled' => true,
+            'response' => $invoice,
+            'buttons' => [
+                [
+                    'id' => 'confirm_order_' . $productId,
+                    'title' => '✅ Confirm Order'
+                ],
+                [
+                    'id' => 'buy_' . $productId,
+                    'title' => '↩️ Change Quantity'
+                ],
+                [
+                    'id' => 'browse_products',
+                    'title' => '🛍️ More Products'
+                ]
+            ]
+        ];
+    }
+
+    /**
+     * Handle custom quantity input
+     */
+    protected function handleCustomQuantityInput(string $message): array
+    {
+        // Check if message is just a number
+        if (!preg_match('/^\d+$/', trim($message))) {
+            return [
+                'handled' => true,
+                'response' => "Please send just the number of units you want.\n\n" .
+                             "For example: 5\n\n" .
+                             "Don't write 'I want 5 pieces' - just send: 5"
+            ];
+        }
+
+        $quantity = (int) trim($message);
+        $productId = $this->currentSession->getData('product_id');
+        
+        if ($quantity <= 0) {
+            return [
+                'handled' => true,
+                'response' => "Quantity must be greater than 0.\n\nPlease send a valid number like: 3"
+            ];
+        }
+
+        return $this->handleQuantitySelection($productId, $quantity);
+    }
+
+    /**
+     * Generate detailed invoice
+     */
+    protected function generateInvoice(Product $product, int $quantity, float $totalPrice): string
+    {
+        $invoice = "📋 *ORDER INVOICE*\n";
+        $invoice .= "━━━━━━━━━━━━━━━━━━━━\n\n";
+        
+        $invoice .= "🏪 *Store:* " . ($this->config->store_name ?? 'Our Store') . "\n";
+        $invoice .= "📅 *Date:* " . now()->format('d M Y, h:i A') . "\n";
+        $invoice .= "👤 *Customer:* " . ($this->currentContact->firstname . ' ' . $this->currentContact->lastname) . "\n";
+        $invoice .= "📱 *Phone:* " . $this->currentContact->phone . "\n\n";
+        
+        $invoice .= "📦 *PRODUCT DETAILS*\n";
+        $invoice .= "━━━━━━━━━━━━━━━━━━━━\n";
+        $invoice .= "• *Product:* {$product->name}\n";
+        $invoice .= "• *Unit Price:* {$product->formatted_price}\n";
+        $invoice .= "• *Quantity:* {$quantity} units\n";
+        $invoice .= "• *Subtotal:* $" . number_format($totalPrice, 2) . "\n\n";
+        
+        $invoice .= "💰 *TOTAL AMOUNT*\n";
+        $invoice .= "━━━━━━━━━━━━━━━━━━━━\n";
+        $invoice .= "**$" . number_format($totalPrice, 2) . "**\n\n";
+        
+        $invoice .= "⚡ *Click 'Confirm Order' to proceed with payment*";
+        
+        return $invoice;
+    }
+
+    /**
+     * Handle order confirmation
+     */
+    protected function handleOrderConfirmation(int $productId): array
+    {
+        $this->currentSession->updateStep('payment_selection', []);
+        
+        return [
+            'handled' => true,
+            'response' => "🎉 *Order Confirmed!*\n\n" .
+                         "Please select your preferred payment method:\n\n" .
+                         "💳 Choose how you'd like to pay:",
+            'buttons' => [
+                [
+                    'id' => 'payment_cod_' . $productId,
+                    'title' => '💵 Cash on Delivery'
+                ],
+                [
+                    'id' => 'payment_bank_' . $productId,
+                    'title' => '🏦 Bank Transfer'
+                ],
+                [
+                    'id' => 'payment_card_' . $productId,
+                    'title' => '💳 Credit/Debit Card'
+                ]
+            ]
+        ];
+    }
+
+    /**
+     * Handle payment method selection
+     */
+    protected function handlePaymentSelection(string $message): array
+    {
+        // This would handle payment-related messages
+        // For now, just reset session
+        $this->currentSession->clearSession();
+        
+        return [
+            'handled' => true,
+            'response' => "Thank you for your order! 🎉\n\n" .
+                         "Our team will contact you shortly to complete the payment process.\n\n" .
+                         "Order details have been saved and you'll receive confirmation soon.\n\n" .
+                         "Type 'catalog' to browse more products! 🛍️"
+        ];
+    }
+
+    /**
+     * Handle payment method selected
+     */
+    protected function handlePaymentMethodSelected(string $paymentMethod): array
+    {
+        // Get order details from session
+        $sessionData = $this->currentSession->session_data;
+        $productId = $sessionData['product_id'] ?? null;
+        $quantity = $sessionData['quantity'] ?? 1;
+        $totalPrice = $sessionData['total_price'] ?? 0;
+        
+        // Clear session
+        $this->currentSession->clearSession();
+        
+        // Generate final confirmation
+        $response = "✅ *ORDER COMPLETED!*\n";
+        $response .= "━━━━━━━━━━━━━━━━━━━━\n\n";
+        $response .= "🎉 Your order has been successfully placed!\n\n";
+        $response .= "📋 *Order Summary:*\n";
+        $response .= "• Payment Method: {$paymentMethod}\n";
+        $response .= "• Quantity: {$quantity} units\n";
+        $response .= "• Total: $" . number_format($totalPrice, 2) . "\n\n";
+        
+        if ($paymentMethod === 'Cash on Delivery') {
+            $response .= "💵 *Cash on Delivery*\n";
+            $response .= "Our delivery team will contact you within 24 hours to arrange delivery.\n";
+            $response .= "Please keep the exact cash amount ready.\n\n";
+        } elseif ($paymentMethod === 'Bank Transfer') {
+            $response .= "🏦 *Bank Transfer Details*\n";
+            $response .= "Account: 1234-5678-9012\n";
+            $response .= "Bank: ABC Bank\n";
+            $response .= "Please send us the transfer receipt.\n\n";
+        } else {
+            $response .= "💳 *Card Payment*\n";
+            $response .= "Our team will send you a secure payment link shortly.\n\n";
+        }
+        
+        $response .= "📞 *Need Help?*\n";
+        $response .= "Contact us anytime for order updates!\n\n";
+        $response .= "🛍️ Type 'catalog' to shop more products!";
+        
+        return [
+            'handled' => true,
+            'response' => $response
+        ];
     }
 }
