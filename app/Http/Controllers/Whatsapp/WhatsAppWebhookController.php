@@ -21,8 +21,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Netflie\WhatsAppCloudApi\WhatsAppCloudApi;
-use Netflie\WhatsAppCloudApi\Message\ButtonReply\Button;
-use Netflie\WhatsAppCloudApi\Message\ButtonReply\ButtonAction;
 use stdClass;
 
 class WhatsAppWebhookController extends Controller
@@ -284,12 +282,29 @@ class WhatsAppWebhookController extends Controller
                                             'buttons_count' => count($ecommerceResult['buttons'])
                                         ]);
                                         
-                                        $response = $this->sendInteractiveButtons(
-                                            $contact_number,
-                                            $ecommerceResult['response'],
-                                            $ecommerceResult['buttons'],
-                                            $metadata['phone_number_id']
-                                        );
+                                        // Create button message using existing WhatsApp trait pattern
+                                        $buttonMessage = [
+                                            'type' => 'text',
+                                            'message' => $ecommerceResult['response'],
+                                            'reply_text' => $ecommerceResult['response'],
+                                            'bot_header' => '',
+                                            'bot_footer' => '',
+                                            'rel_type' => $contact_data->type ?? 'lead',
+                                            'rel_id' => $contact_data->id,
+                                            'tenant_id' => $this->tenant_id,
+                                            'sending_count' => 0,
+                                            'filename' => '',
+                                        ];
+                                        
+                                        // Add up to 3 buttons
+                                        $buttons = array_slice($ecommerceResult['buttons'], 0, 3);
+                                        foreach ($buttons as $index => $button) {
+                                            $buttonNum = $index + 1;
+                                            $buttonMessage["button{$buttonNum}_id"] = $button['id'];
+                                            $buttonMessage["button{$buttonNum}"] = substr($button['title'], 0, 20);
+                                        }
+                                        
+                                        $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $buttonMessage, $metadata['phone_number_id']);
                                     } else {
                                         EcommerceLogger::info('Sending message without buttons', [
                                             'tenant_id' => $this->tenant_id,
@@ -3273,116 +3288,4 @@ class WhatsAppWebhookController extends Controller
         }
     }
 
-    /**
-     * Send interactive buttons for e-commerce
-     */
-    protected function sendInteractiveButtons($contactNumber, $bodyText, $buttons, $phoneNumberId)
-    {
-        try {
-            EcommerceLogger::info('Preparing interactive buttons', [
-                'tenant_id' => $this->tenant_id,
-                'phone' => $contactNumber,
-                'buttons' => $buttons
-            ]);
-            
-            try {
-                $whatsapp_cloud_api = new WhatsAppCloudApi([
-                    'from_phone_number_id' => $phoneNumberId,
-                    'access_token' => get_wa_access_token($this->tenant_id),
-                ]);
-                
-                EcommerceLogger::info('WhatsApp API initialized', [
-                    'tenant_id' => $this->tenant_id,
-                    'phone_number_id' => $phoneNumberId
-                ]);
-            } catch (\Exception $apiEx) {
-                EcommerceLogger::error('Failed to initialize WhatsApp API', [
-                    'error' => $apiEx->getMessage(),
-                    'trace' => $apiEx->getTraceAsString()
-                ]);
-                throw $apiEx;
-            }
-
-            // Format buttons for WhatsApp API (max 3 buttons)
-            try {
-                $buttonRows = [];
-                foreach (array_slice($buttons, 0, 3) as $button) {
-                    $buttonRows[] = new Button(
-                        $button['id'],
-                        substr($button['title'], 0, 20) // Max 20 chars for button title
-                    );
-                }
-                
-                EcommerceLogger::info('Button objects created', [
-                    'tenant_id' => $this->tenant_id,
-                    'buttons_count' => count($buttonRows)
-                ]);
-                
-                $buttonAction = new ButtonAction($buttonRows);
-                
-                EcommerceLogger::info('ButtonAction created', [
-                    'tenant_id' => $this->tenant_id
-                ]);
-            } catch (\Exception $btnEx) {
-                EcommerceLogger::error('Failed to create Button objects', [
-                    'error' => $btnEx->getMessage(),
-                    'trace' => $btnEx->getTraceAsString()
-                ]);
-                throw $btnEx;
-            }
-
-            EcommerceLogger::info('Sending button message to WhatsApp', [
-                'tenant_id' => $this->tenant_id,
-                'phone' => $contactNumber,
-                'buttons_count' => count($buttonRows)
-            ]);
-
-            $response = $whatsapp_cloud_api->sendButton(
-                $contactNumber,
-                $bodyText,
-                $buttonAction
-            );
-
-            EcommerceLogger::info('Interactive buttons sent successfully', [
-                'contact_number' => $contactNumber,
-                'buttons_count' => count($buttonRows),
-                'tenant_id' => $this->tenant_id,
-                'response' => $response
-            ]);
-
-            return $response;
-        } catch (\Exception $e) {
-            EcommerceLogger::error('Failed to send interactive buttons', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'contact_number' => $contactNumber,
-                'tenant_id' => $this->tenant_id,
-            ]);
-            
-            // Fallback to text message with button text
-            $fallbackText = $bodyText . "\n\n*Quick Actions:*\n";
-            foreach ($buttons as $index => $button) {
-                $fallbackText .= ($index + 1) . ". " . $button['title'] . "\n";
-            }
-            $fallbackText .= "\nReply with the number or button text to proceed.";
-            
-            EcommerceLogger::info('Sending fallback text message', [
-                'tenant_id' => $this->tenant_id,
-                'phone' => $contactNumber
-            ]);
-            
-            return $this->setWaTenantId($this->tenant_id)->sendMessage($contactNumber, [
-                'type' => 'text',
-                'message' => $fallbackText,
-                'reply_text' => $fallbackText,
-                'bot_header' => '',
-                'bot_footer' => '',
-                'rel_type' => 'lead',
-                'rel_id' => 0,
-                'tenant_id' => $this->tenant_id,
-                'sending_count' => 0,
-                'filename' => '',
-            ], $phoneNumberId);
-        }
-    }
 }
