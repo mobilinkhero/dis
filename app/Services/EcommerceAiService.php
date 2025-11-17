@@ -57,11 +57,24 @@ class EcommerceAiService
             $response = $this->callAiApi($messages);
             
             if ($response['success']) {
+                EcommerceLogger::info('AI API call successful', [
+                    'tenant_id' => $this->tenantId,
+                    'raw_response' => $response['response'],
+                    'response_length' => strlen($response['response'])
+                ]);
+                
                 // Update conversation history
                 $this->updateConversationHistory($contact, $message, $response['response']);
                 
                 // Parse AI response for actions
                 $parsedResponse = $this->parseAiResponse($response['response'], $contact);
+                
+                EcommerceLogger::info('Parsed AI response', [
+                    'tenant_id' => $this->tenantId,
+                    'final_message' => $parsedResponse['message'],
+                    'has_buttons' => !empty($parsedResponse['buttons']),
+                    'has_actions' => !empty($parsedResponse['actions'])
+                ]);
                 
                 return [
                     'handled' => true,
