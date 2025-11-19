@@ -185,26 +185,61 @@ class AiEcommerceService
     protected function getProductDataFromSheets(): array
     {
         try {
+            EcommerceLogger::info('🤖 AI-SHEETS: Starting sheet data extraction', [
+                'tenant_id' => $this->tenantId,
+                'sheets_url' => $this->config->google_sheets_url
+            ]);
+
             // Extract sheet ID
             $sheetId = $this->sheetsService->extractSheetId($this->config->google_sheets_url);
+            
+            EcommerceLogger::info('🤖 AI-SHEETS: Sheet ID extracted', [
+                'tenant_id' => $this->tenantId,
+                'sheet_id' => $sheetId ? 'extracted_successfully' : 'extraction_failed',
+                'sheet_id_value' => $sheetId
+            ]);
+
             if (!$sheetId) {
+                EcommerceLogger::error('🤖 AI-SHEETS: Failed to extract sheet ID', [
+                    'tenant_id' => $this->tenantId,
+                    'url' => $this->config->google_sheets_url
+                ]);
                 return [];
             }
 
             // Get data using service account or public access
+            EcommerceLogger::info('🤖 AI-SHEETS: Checking service account status', [
+                'tenant_id' => $this->tenantId
+            ]);
+
             $serviceAccountService = app(GoogleSheetsServiceAccountService::class);
             $serviceAccountStatus = $serviceAccountService->checkServiceAccountStatus($this->tenantId);
 
+            EcommerceLogger::info('🤖 AI-SHEETS: Service account status checked', [
+                'tenant_id' => $this->tenantId,
+                'configured' => $serviceAccountStatus['configured'] ?? false,
+                'status_details' => $serviceAccountStatus
+            ]);
+
             if ($serviceAccountStatus['configured']) {
+                EcommerceLogger::info('🤖 AI-SHEETS: Using service account method', [
+                    'tenant_id' => $this->tenantId
+                ]);
                 return $this->fetchProductsWithServiceAccount($sheetId, $serviceAccountService);
             } else {
+                EcommerceLogger::info('🤖 AI-SHEETS: Using public CSV method', [
+                    'tenant_id' => $this->tenantId
+                ]);
                 return $this->fetchProductsPublic($sheetId);
             }
 
         } catch (\Exception $e) {
-            EcommerceLogger::error('Failed to fetch products from sheets', [
+            EcommerceLogger::error('🤖 AI-SHEETS: Exception in sheet data fetching', [
                 'error' => $e->getMessage(),
-                'tenant_id' => $this->tenantId
+                'tenant_id' => $this->tenantId,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
             ]);
             return [];
         }
@@ -238,22 +273,71 @@ class AiEcommerceService
     {
         $csvUrl = "https://docs.google.com/spreadsheets/d/{$sheetId}/export?format=csv&gid=0";
         
-        $response = Http::timeout(15)->get($csvUrl);
-        if (!$response->successful()) {
+        EcommerceLogger::info('🤖 AI-SHEETS: Fetching via public CSV', [
+            'tenant_id' => $this->tenantId,
+            'csv_url' => $csvUrl
+        ]);
+        
+        try {
+            $response = Http::timeout(15)->get($csvUrl);
+            
+            EcommerceLogger::info('🤖 AI-SHEETS: HTTP response received', [
+                'tenant_id' => $this->tenantId,
+                'success' => $response->successful(),
+                'status_code' => $response->status(),
+                'response_size' => strlen($response->body())
+            ]);
+            
+            if (!$response->successful()) {
+                EcommerceLogger::error('🤖 AI-SHEETS: CSV fetch failed', [
+                    'tenant_id' => $this->tenantId,
+                    'status_code' => $response->status(),
+                    'response_body' => substr($response->body(), 0, 500)
+                ]);
+                return [];
+            }
+
+            $csvData = str_getcsv($response->body(), "\n");
+            $header = str_getcsv(array_shift($csvData));
+            
+            EcommerceLogger::info('🤖 AI-SHEETS: CSV data parsed', [
+                'tenant_id' => $this->tenantId,
+                'total_rows' => count($csvData),
+                'header_columns' => $header,
+                'first_row_sample' => isset($csvData[0]) ? str_getcsv($csvData[0]) : 'no_data'
+            ]);
+            
+            $products = [];
+            foreach ($csvData as $index => $row) {
+                if (empty($row)) continue;
+                $rowData = str_getcsv($row);
+                $products[] = array_combine($header, array_pad($rowData, count($header), ''));
+                
+                // Log first few products for debugging
+                if ($index < 3) {
+                    EcommerceLogger::info("🤖 AI-SHEETS: Product {$index} parsed", [
+                        'tenant_id' => $this->tenantId,
+                        'product_data' => array_combine($header, array_pad($rowData, count($header), ''))
+                    ]);
+                }
+            }
+
+            EcommerceLogger::info('🤖 AI-SHEETS: Products parsing completed', [
+                'tenant_id' => $this->tenantId,
+                'products_count' => count($products)
+            ]);
+
+            return $products;
+            
+        } catch (\Exception $e) {
+            EcommerceLogger::error('🤖 AI-SHEETS: Exception in public CSV fetching', [
+                'tenant_id' => $this->tenantId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
             return [];
         }
-
-        $csvData = str_getcsv($response->body(), "\n");
-        $header = str_getcsv(array_shift($csvData));
-        
-        $products = [];
-        foreach ($csvData as $row) {
-            if (empty($row)) continue;
-            $rowData = str_getcsv($row);
-            $products[] = array_combine($header, array_pad($rowData, count($header), ''));
-        }
-
-        return $products;
     }
 
     /**
