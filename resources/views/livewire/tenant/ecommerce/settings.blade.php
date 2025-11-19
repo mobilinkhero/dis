@@ -202,7 +202,12 @@
                         </label>
                     </div>
 
-                    @if($settings['ai_powered_mode'] ?? false)
+                    <!-- Debug info (remove after testing) -->
+                    <div class="text-xs text-gray-500 mb-2">
+                        Debug: AI Mode = {{ $settings['ai_powered_mode'] ? 'ON' : 'OFF' }}
+                    </div>
+
+                    @if($settings['ai_powered_mode'])
                         <div class="space-y-4 mt-4 pt-4 border-t border-purple-200 dark:border-purple-700">
                             <!-- OpenAI API Key -->
                             <div>
@@ -217,10 +222,9 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">AI Model</label>
                                 <select wire:model="settings.openai_model" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Recommended)</option>
-                                    <option value="gpt-4">GPT-4 (More Advanced)</option>
-                                    <option value="gpt-4-turbo-preview">GPT-4 Turbo (Latest)</option>
-                                    <option value="gpt-3.5-turbo-16k">GPT-3.5 Turbo 16K (Long Context)</option>
+                                    @foreach($availableAiModels as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
                                 </select>
                             </div>
 

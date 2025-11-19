@@ -61,7 +61,15 @@ class EcommerceSettings extends Component
             'enabled' => false,
             'free_shipping_threshold' => 0,
             'default_shipping_cost' => 0
-        ]
+        ],
+        'ai_powered_mode' => false,
+        'openai_api_key' => '',
+        'openai_model' => 'gpt-3.5-turbo',
+        'ai_temperature' => 0.7,
+        'ai_max_tokens' => 500,
+        'ai_system_prompt' => '',
+        'direct_sheets_integration' => false,
+        'bypass_local_database' => false
     ];
 
     public $availablePaymentMethods = [
@@ -79,6 +87,13 @@ class EcommerceSettings extends Component
         'JPY' => 'Japanese Yen (¥)',
         'AUD' => 'Australian Dollar (A$)',
         'CAD' => 'Canadian Dollar (C$)'
+    ];
+
+    public $availableAiModels = [
+        'gpt-3.5-turbo' => 'GPT-3.5 Turbo (Recommended)',
+        'gpt-4' => 'GPT-4 (More Advanced)',
+        'gpt-4-turbo-preview' => 'GPT-4 Turbo (Latest)',
+        'gpt-3.5-turbo-16k' => 'GPT-3.5 Turbo 16K (Long Context)'
     ];
 
     protected $rules = [
@@ -207,6 +222,32 @@ class EcommerceSettings extends Component
                 'card' => '💳 *Card Payment*\nOur team will send you a secure payment link shortly.',
                 'online' => '🌐 *Online Payment*\nRedirecting to secure payment gateway...'
             ];
+        }
+        
+        // Ensure AI settings exist
+        if (!isset($this->settings['ai_powered_mode'])) {
+            $this->settings['ai_powered_mode'] = false;
+        }
+        if (!isset($this->settings['openai_api_key'])) {
+            $this->settings['openai_api_key'] = '';
+        }
+        if (!isset($this->settings['openai_model'])) {
+            $this->settings['openai_model'] = 'gpt-3.5-turbo';
+        }
+        if (!isset($this->settings['ai_temperature'])) {
+            $this->settings['ai_temperature'] = 0.7;
+        }
+        if (!isset($this->settings['ai_max_tokens'])) {
+            $this->settings['ai_max_tokens'] = 500;
+        }
+        if (!isset($this->settings['ai_system_prompt'])) {
+            $this->settings['ai_system_prompt'] = '';
+        }
+        if (!isset($this->settings['direct_sheets_integration'])) {
+            $this->settings['direct_sheets_integration'] = false;
+        }
+        if (!isset($this->settings['bypass_local_database'])) {
+            $this->settings['bypass_local_database'] = false;
         }
     }
 
