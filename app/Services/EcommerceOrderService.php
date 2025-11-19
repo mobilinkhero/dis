@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Tenant\EcommerceConfiguration;
+use App\Models\Tenant\Contact;
 use App\Models\Tenant\Product;
 use App\Models\Tenant\Order;
 use App\Models\Tenant\OrderItem;
@@ -38,31 +39,49 @@ class EcommerceOrderService
      */
     public function processMessage(string $message, Contact $contact): array
     {
+        EcommerceLogger::info('🔍 PROCESSING: Starting message processing', [
+            'tenant_id' => $this->tenantId,
+            'message' => $message,
+            'contact_id' => $contact->id ?? 'unknown',
+            'contact_phone' => $contact->phone ?? 'unknown'
+        ]);
+
         try {
-            EcommerceLogger::info('Processing WhatsApp message for e-commerce', [
-                'tenant_id' => $this->tenantId,
-                'phone' => $contact->phone ?? 'unknown',
-                'message' => $message
-            ]);
-
-            EcommerceLogger::botInteraction($contact->phone ?? 'unknown', $message, 'Processing started');
-
-            if (!$this->config || !$this->config->isFullyConfigured()) {
-                EcommerceLogger::warning('E-commerce not configured', [
+            if (!$this->config) {
+                EcommerceLogger::error('🔍 PROCESSING: No ecommerce config found', [
                     'tenant_id' => $this->tenantId,
-                    'has_config' => $this->config !== null,
-                    'is_configured' => $this->config ? $this->config->isFullyConfigured() : false
+                    'message' => $message
                 ]);
-                
                 return [
                     'handled' => false,
-                    'response' => ''
+                    'response' => 'E-commerce not configured'
                 ];
             }
 
-            EcommerceLogger::info('E-commerce configuration verified', [
+            EcommerceLogger::info('🔍 PROCESSING: Config found, checking if fully configured', [
                 'tenant_id' => $this->tenantId,
-                'message' => $message
+                'is_configured' => $this->config->is_configured ?? 'unknown',
+                'has_sheets_url' => !empty($this->config->google_sheets_url),
+                'ai_powered_mode' => $this->config->ai_powered_mode ?? 'unknown'
+            ]);
+
+            if (!$this->config->isFullyConfigured()) {
+                EcommerceLogger::error('🔍 PROCESSING: Ecommerce config incomplete', [
+                    'tenant_id' => $this->tenantId,
+                    'message' => $message,
+                    'is_configured' => $this->config->is_configured ?? 'unknown',
+                    'google_sheets_url' => !empty($this->config->google_sheets_url) ? 'set' : 'missing'
+                ]);
+                return [
+                    'handled' => false,
+                    'response' => 'E-commerce configuration incomplete'
+                ];
+            }
+
+            EcommerceLogger::info('🔍 PROCESSING: E-commerce configuration verified', [
+                'tenant_id' => $this->tenantId,
+                'message' => $message,
+                'ai_powered_mode' => $this->config->ai_powered_mode ?? false
             ]);
 
             $this->currentContact = $contact;
