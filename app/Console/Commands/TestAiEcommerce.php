@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Services\AiEcommerceService;
 use App\Models\Tenant\EcommerceConfiguration;
-use App\Models\Contact;
+use App\Models\Tenant\Contact;
 
 class TestAiEcommerce extends Command
 {
