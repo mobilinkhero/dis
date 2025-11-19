@@ -239,13 +239,33 @@ class WhatsAppWebhookController extends Controller
                         $this->is_bot_stop = true;
                     }
 
+                    EcommerceLogger::info('📞 WEBHOOK: Checking if bot is stopped', [
+                        'tenant_id' => $this->tenant_id,
+                        'phone' => $contact_number,
+                        'is_bot_stop' => $this->is_bot_stop,
+                        'will_process_ecommerce' => !$this->is_bot_stop
+                    ]);
+
                     if (! $this->is_bot_stop) {
+                        EcommerceLogger::info('📞 WEBHOOK: Bot not stopped, proceeding with ecommerce processing', [
+                            'tenant_id' => $this->tenant_id,
+                            'phone' => $contact_number
+                        ]);
+
                         try {
                             // First, try to handle e-commerce interactions
                             EcommerceLogger::info('Processing WhatsApp message for e-commerce', [
                                 'tenant_id' => $this->tenant_id,
                                 'phone' => $contact_number,
                                 'message' => $trigger_msg
+                            ]);
+
+                            EcommerceLogger::info('📞 WEBHOOK: About to check contact data', [
+                                'tenant_id' => $this->tenant_id,
+                                'phone' => $contact_number,
+                                'contact_data_exists' => isset($contact_data),
+                                'contact_data_id' => $contact_data->id ?? 'no_id',
+                                'contact_data_phone' => $contact_data->phone ?? 'no_phone'
                             ]);
 
                             EcommerceLogger::info('📞 WEBHOOK: Starting ecommerce processing', [
@@ -255,7 +275,18 @@ class WhatsAppWebhookController extends Controller
                                 'contact_id' => $contact_data->id ?? 'unknown'
                             ]);
 
+                            EcommerceLogger::info('📞 WEBHOOK: Creating EcommerceOrderService', [
+                                'tenant_id' => $this->tenant_id,
+                                'service_class_exists' => class_exists('App\Services\EcommerceOrderService')
+                            ]);
+
                             $ecommerceService = new EcommerceOrderService($this->tenant_id);
+                            
+                            EcommerceLogger::info('📞 WEBHOOK: EcommerceOrderService created, calling processMessage', [
+                                'tenant_id' => $this->tenant_id,
+                                'service_created' => isset($ecommerceService),
+                                'message' => $trigger_msg
+                            ]);
                             $ecommerceResult = $ecommerceService->processMessage($trigger_msg, $contact_data);
                             
                             EcommerceLogger::info('📞 WEBHOOK: Ecommerce processing completed', [
