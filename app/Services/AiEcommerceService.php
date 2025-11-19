@@ -31,26 +31,116 @@ class AiEcommerceService
      */
     public function processMessage(string $message, $contact): array
     {
+        EcommerceLogger::info('🤖 AI-SERVICE: Starting message processing', [
+            'tenant_id' => $this->tenantId,
+            'message' => $message,
+            'contact_phone' => $contact->phone ?? 'unknown'
+        ]);
+
         try {
             if (!$this->isAiConfigured()) {
+                EcommerceLogger::error('🤖 AI-CONFIG: AI not properly configured', [
+                    'tenant_id' => $this->tenantId,
+                    'config_exists' => $this->config ? 'yes' : 'no',
+                    'ai_mode' => $this->config->ai_powered_mode ?? 'unknown',
+                    'api_key_exists' => !empty($this->config->openai_api_key ?? ''),
+                    'sheets_url_exists' => !empty($this->config->google_sheets_url ?? '')
+                ]);
                 return [
                     'handled' => false,
-                    'response' => 'AI is not configured for this store. Please contact support.'
+                    'response' => 'AI is not properly configured'
                 ];
             }
 
+            EcommerceLogger::info('🤖 AI-CONFIG: AI configuration validated', [
+                'tenant_id' => $this->tenantId,
+                'model' => $this->config->openai_model,
+                'temperature' => $this->config->ai_temperature,
+                'max_tokens' => $this->config->ai_max_tokens,
+                'direct_sheets' => $this->config->direct_sheets_integration
+            ]);
+
             // Get current product data from Google Sheets
+            EcommerceLogger::info('🤖 AI-SHEETS: Fetching products from Google Sheets', [
+                'tenant_id' => $this->tenantId,
+                'sheets_url' => $this->config->google_sheets_url
+            ]);
+
             $productData = $this->getProductDataFromSheets();
-            
+
+            EcommerceLogger::info('🤖 AI-SHEETS: Products fetched', [
+                'tenant_id' => $this->tenantId,
+                'products_count' => count($productData),
+                'products_preview' => array_slice($productData, 0, 3)
+            ]);
+
+            if (empty($productData)) {
+                EcommerceLogger::error('🤖 AI-SHEETS: No products available', [
+                    'tenant_id' => $this->tenantId
+                ]);
+                return [
+                    'handled' => false,
+                    'response' => 'No products available'
+                ];
+            }
+
             // Create AI context
+            EcommerceLogger::info('🤖 AI-PROMPT: Building AI prompt', [
+                'tenant_id' => $this->tenantId,
+                'message' => $message
+            ]);
+
             $systemPrompt = $this->buildSystemPrompt($productData, $contact);
-            
+
+            EcommerceLogger::info('🤖 AI-PROMPT: Prompt built', [
+                'tenant_id' => $this->tenantId,
+                'prompt_length' => strlen($systemPrompt),
+                'prompt_preview' => substr($systemPrompt, 0, 200) . '...'
+            ]);
+
             // Get AI response
+            EcommerceLogger::info('🤖 AI-OPENAI: Calling OpenAI API', [
+                'tenant_id' => $this->tenantId,
+                'model' => $this->config->openai_model,
+                'temperature' => $this->config->ai_temperature,
+                'max_tokens' => $this->config->ai_max_tokens
+            ]);
+
             $aiResponse = $this->callOpenAI($systemPrompt, $message);
-            
+
+            EcommerceLogger::info('🤖 AI-OPENAI: OpenAI response received', [
+                'tenant_id' => $this->tenantId,
+                'response_received' => !empty($aiResponse),
+                'response_length' => strlen($aiResponse ?? ''),
+                'response_preview' => substr($aiResponse ?? '', 0, 200) . '...'
+            ]);
+
+            if (!$aiResponse) {
+                EcommerceLogger::error('🤖 AI-OPENAI: No response from OpenAI', [
+                    'tenant_id' => $this->tenantId
+                ]);
+                return [
+                    'handled' => false,
+                    'response' => 'AI service unavailable'
+                ];
+            }
+
             // Parse AI response for actions
+            EcommerceLogger::info('🤖 AI-PARSE: Parsing AI response', [
+                'tenant_id' => $this->tenantId
+            ]);
+
             $parsedResponse = $this->parseAiResponse($aiResponse);
-            
+
+            EcommerceLogger::info('🤖 AI-PARSE: AI response parsed', [
+                'tenant_id' => $this->tenantId,
+                'handled' => $parsedResponse['handled'] ?? false,
+                'response_length' => strlen($parsedResponse['response'] ?? ''),
+                'has_buttons' => !empty($parsedResponse['buttons']),
+                'has_actions' => !empty($parsedResponse['actions']),
+                'full_parsed_response' => $parsedResponse
+            ]);
+
             EcommerceLogger::info('AI processed message', [
                 'tenant_id' => $this->tenantId,
                 'contact_id' => $contact->id,

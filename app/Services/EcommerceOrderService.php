@@ -69,49 +69,102 @@ class EcommerceOrderService
             
             // Check if AI-powered mode is enabled
             if ($this->config->ai_powered_mode) {
-                EcommerceLogger::info('Using AI-powered mode for message processing', [
+                EcommerceLogger::info('🤖 AI-POWERED MODE: Starting AI processing', [
                     'tenant_id' => $this->tenantId,
-                    'contact_phone' => $contact->phone
+                    'contact_phone' => $contact->phone,
+                    'message' => $message,
+                    'openai_api_key_exists' => !empty($this->config->openai_api_key),
+                    'sheets_url_exists' => !empty($this->config->google_sheets_url),
+                    'model' => $this->config->openai_model ?? 'not_set'
                 ]);
                 
-                $aiService = new AiEcommerceService($this->tenantId);
-                $aiResult = $aiService->processMessage($message, $contact);
-                
-                if ($aiResult['handled']) {
-                    // Execute any AI-generated actions
-                    if (!empty($aiResult['actions'])) {
-                        $aiService->executeActions($aiResult['actions']);
-                    }
+                try {
+                    $aiService = new AiEcommerceService($this->tenantId);
+                    $aiResult = $aiService->processMessage($message, $contact);
                     
-                    // Return AI response with buttons if provided
-                    $response = [
-                        'handled' => true,
-                        'response' => $aiResult['response']
-                    ];
+                    EcommerceLogger::info('🤖 AI-RESPONSE: Received AI result', [
+                        'tenant_id' => $this->tenantId,
+                        'handled' => $aiResult['handled'] ?? false,
+                        'response_length' => strlen($aiResult['response'] ?? ''),
+                        'response_preview' => substr($aiResult['response'] ?? '', 0, 100) . '...',
+                        'has_buttons' => !empty($aiResult['buttons']),
+                        'buttons_count' => count($aiResult['buttons'] ?? []),
+                        'has_actions' => !empty($aiResult['actions']),
+                        'actions_count' => count($aiResult['actions'] ?? []),
+                        'full_ai_result' => $aiResult
+                    ]);
                     
-                    if (!empty($aiResult['buttons'])) {
-                        $response['message_data'] = [
-                            'reply_text' => $aiResult['response'],
-                            'bot_header' => 'AI Shopping Assistant',
-                            'bot_footer' => 'Powered by AI'
+                    if ($aiResult['handled']) {
+                        // Execute any AI-generated actions
+                        if (!empty($aiResult['actions'])) {
+                            EcommerceLogger::info('🤖 AI-ACTIONS: Executing AI actions', [
+                                'tenant_id' => $this->tenantId,
+                                'actions' => $aiResult['actions']
+                            ]);
+                            $aiService->executeActions($aiResult['actions']);
+                        }
+                        
+                        // Return AI response with buttons if provided
+                        $response = [
+                            'handled' => true,
+                            'response' => $aiResult['response']
                         ];
                         
-                        // Add up to 3 buttons
-                        foreach ($aiResult['buttons'] as $index => $button) {
-                            if ($index < 3) {
-                                $buttonNum = $index + 1;
-                                $response['message_data']["button{$buttonNum}_id"] = $button['id'];
-                                $response['message_data']["button{$buttonNum}"] = $button['text'];
+                        if (!empty($aiResult['buttons'])) {
+                            EcommerceLogger::info('🤖 AI-BUTTONS: Adding interactive buttons', [
+                                'tenant_id' => $this->tenantId,
+                                'buttons' => $aiResult['buttons']
+                            ]);
+                            
+                            $response['message_data'] = [
+                                'reply_text' => $aiResult['response'],
+                                'bot_header' => 'AI Shopping Assistant',
+                                'bot_footer' => 'Powered by AI'
+                            ];
+                            
+                            // Add up to 3 buttons
+                            foreach ($aiResult['buttons'] as $index => $button) {
+                                if ($index < 3) {
+                                    $buttonNum = $index + 1;
+                                    $response['message_data']["button{$buttonNum}_id"] = $button['id'];
+                                    $response['message_data']["button{$buttonNum}"] = $button['text'];
+                                }
                             }
+                            
+                            $response['buttons'] = array_slice($aiResult['buttons'], 0, 3);
                         }
+                        
+                        EcommerceLogger::info('🤖 AI-SUCCESS: AI processed successfully, returning response', [
+                            'tenant_id' => $this->tenantId,
+                            'contact_phone' => $contact->phone,
+                            'final_response' => $response
+                        ]);
+                        
+                        EcommerceLogger::botInteraction($contact->phone, $message, 'AI processed successfully');
+                        return $response;
+                    } else {
+                        EcommerceLogger::error('🤖 AI-FAILED: AI could not handle message', [
+                            'tenant_id' => $this->tenantId,
+                            'contact_phone' => $contact->phone,
+                            'message' => $message,
+                            'ai_response' => $aiResult['response'] ?? 'no_response'
+                        ]);
                     }
-                    
-                    EcommerceLogger::botInteraction($contact->phone, $message, 'AI processed successfully');
-                    return $response;
+                } catch (\Exception $e) {
+                    EcommerceLogger::error('🤖 AI-ERROR: Exception in AI processing', [
+                        'tenant_id' => $this->tenantId,
+                        'contact_phone' => $contact->phone,
+                        'message' => $message,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
                 }
                 
                 // If AI couldn't handle it, fall back to traditional flow
-                EcommerceLogger::info('AI mode failed, falling back to traditional flow');
+                EcommerceLogger::info('🤖 AI-FALLBACK: AI mode failed, falling back to traditional flow', [
+                    'tenant_id' => $this->tenantId,
+                    'message' => $message
+                ]);
             }
             
             // Get or create user session (for non-AI mode)

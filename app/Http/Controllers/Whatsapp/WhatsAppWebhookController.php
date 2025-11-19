@@ -248,10 +248,33 @@ class WhatsAppWebhookController extends Controller
                                 'message' => $trigger_msg
                             ]);
 
+                            EcommerceLogger::info('📞 WEBHOOK: Starting ecommerce processing', [
+                                'tenant_id' => $this->tenant_id,
+                                'phone' => $contact_number,
+                                'message' => $trigger_msg,
+                                'contact_id' => $contact_data->id ?? 'unknown'
+                            ]);
+
                             $ecommerceService = new EcommerceOrderService($this->tenant_id);
                             $ecommerceResult = $ecommerceService->processMessage($trigger_msg, $contact_data);
                             
+                            EcommerceLogger::info('📞 WEBHOOK: Ecommerce processing completed', [
+                                'tenant_id' => $this->tenant_id,
+                                'phone' => $contact_number,
+                                'handled' => $ecommerceResult['handled'] ?? false,
+                                'has_response' => !empty($ecommerceResult['response']),
+                                'response_length' => strlen($ecommerceResult['response'] ?? ''),
+                                'has_buttons' => !empty($ecommerceResult['buttons']),
+                                'full_result' => $ecommerceResult
+                            ]);
+                            
                             if ($ecommerceResult['handled'] && $ecommerceResult['response']) {
+                                EcommerceLogger::info('📞 WEBHOOK: Preparing to send ecommerce response', [
+                                    'tenant_id' => $this->tenant_id,
+                                    'phone' => $contact_number,
+                                    'response_preview' => substr($ecommerceResult['response'], 0, 100) . '...'
+                                ]);
+
                                 EcommerceLogger::botInteraction(
                                     $contact_number, 
                                     $trigger_msg, 
@@ -304,14 +327,33 @@ class WhatsAppWebhookController extends Controller
                                             $buttonMessage["button{$buttonNum}"] = substr($button['title'], 0, 20);
                                         }
                                         
-                                        $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $buttonMessage, $metadata['phone_number_id']);
-                                    } else {
-                                        EcommerceLogger::info('Sending message without buttons', [
+                                        EcommerceLogger::info('📞 WEBHOOK: Sending message with buttons', [
                                             'tenant_id' => $this->tenant_id,
-                                            'phone' => $contact_number
+                                            'phone' => $contact_number,
+                                            'message_data' => $buttonMessage
+                                        ]);
+
+                                        $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $buttonMessage, $metadata['phone_number_id']);
+                                        
+                                        EcommerceLogger::info('📞 WEBHOOK: Message with buttons sent', [
+                                            'tenant_id' => $this->tenant_id,
+                                            'phone' => $contact_number,
+                                            'response' => $response
+                                        ]);
+                                    } else {
+                                        EcommerceLogger::info('📞 WEBHOOK: Sending message without buttons', [
+                                            'tenant_id' => $this->tenant_id,
+                                            'phone' => $contact_number,
+                                            'message_data' => $ecommerceMessage
                                         ]);
                                         
                                         $response = $this->setWaTenantId($this->tenant_id)->sendMessage($contact_number, $ecommerceMessage, $metadata['phone_number_id']);
+                                        
+                                        EcommerceLogger::info('📞 WEBHOOK: Message without buttons sent', [
+                                            'tenant_id' => $this->tenant_id,
+                                            'phone' => $contact_number, 
+                                            'response' => $response
+                                        ]);
                                     }
                                     
                                     $chatId = $this->createOrUpdateInteraction(
