@@ -110,6 +110,14 @@ class EcommerceSettings extends Component
         'settings.shipping_settings.enabled' => 'nullable|boolean',
         'settings.shipping_settings.free_shipping_threshold' => 'nullable|numeric|min:0',
         'settings.shipping_settings.default_shipping_cost' => 'nullable|numeric|min:0',
+        'settings.ai_powered_mode' => 'nullable|boolean',
+        'settings.openai_api_key' => 'nullable|string|max:255',
+        'settings.openai_model' => 'nullable|string|in:gpt-3.5-turbo,gpt-4,gpt-4-turbo-preview,gpt-3.5-turbo-16k',
+        'settings.ai_temperature' => 'nullable|numeric|min:0|max:2',
+        'settings.ai_max_tokens' => 'nullable|integer|min:50|max:4000',
+        'settings.ai_system_prompt' => 'nullable|string|max:5000',
+        'settings.direct_sheets_integration' => 'nullable|boolean',
+        'settings.bypass_local_database' => 'nullable|boolean',
     ];
 
     public function mount()
@@ -152,7 +160,15 @@ class EcommerceSettings extends Component
                     'enabled' => false,
                     'free_shipping_threshold' => 0,
                     'default_shipping_cost' => 0
-                ]
+                ],
+                'ai_powered_mode' => $this->config->ai_powered_mode ?? false,
+                'openai_api_key' => $this->config->openai_api_key ?? '',
+                'openai_model' => $this->config->openai_model ?? 'gpt-3.5-turbo',
+                'ai_temperature' => $this->config->ai_temperature ?? 0.7,
+                'ai_max_tokens' => $this->config->ai_max_tokens ?? 500,
+                'ai_system_prompt' => $this->config->ai_system_prompt ?? '',
+                'direct_sheets_integration' => $this->config->direct_sheets_integration ?? false,
+                'bypass_local_database' => $this->config->bypass_local_database ?? false
             ];
         }
     }
@@ -253,6 +269,14 @@ class EcommerceSettings extends Component
                 'abandoned_cart_settings' => $this->settings['abandoned_cart_settings'],
                 'upselling_settings' => $this->settings['upselling_settings'],
                 'shipping_settings' => $this->settings['shipping_settings'],
+                'ai_powered_mode' => $this->settings['ai_powered_mode'] ?? false,
+                'openai_api_key' => $this->settings['openai_api_key'] ?? null,
+                'openai_model' => $this->settings['openai_model'] ?? 'gpt-3.5-turbo',
+                'ai_temperature' => $this->settings['ai_temperature'] ?? 0.7,
+                'ai_max_tokens' => $this->settings['ai_max_tokens'] ?? 500,
+                'ai_system_prompt' => $this->settings['ai_system_prompt'] ?? null,
+                'direct_sheets_integration' => $this->settings['direct_sheets_integration'] ?? false,
+                'bypass_local_database' => $this->settings['bypass_local_database'] ?? false,
             ]);
 
             \Log::info('🔧 SaveSettings: Config updated successfully');

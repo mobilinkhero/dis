@@ -188,7 +188,86 @@
         <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">AI & Automation</h3>
             
-            <div class="space-y-4">
+            <div class="space-y-6">
+                <!-- AI-Powered Mode -->
+                <div class="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-700">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <p class="text-sm font-medium text-purple-900 dark:text-purple-100">🤖 AI-Powered E-commerce Bot</p>
+                            <p class="text-xs text-purple-700 dark:text-purple-300">Let AI handle all customer interactions with your Google Sheets data</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" wire:model="settings.ai_powered_mode" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                        </label>
+                    </div>
+
+                    @if($settings['ai_powered_mode'] ?? false)
+                        <div class="space-y-4 mt-4 pt-4 border-t border-purple-200 dark:border-purple-700">
+                            <!-- OpenAI API Key -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">OpenAI API Key *</label>
+                                <input type="password" wire:model="settings.openai_api_key" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                       placeholder="sk-...">
+                                <p class="text-xs text-gray-500 mt-1">Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" class="text-purple-600 hover:underline">OpenAI Platform</a></p>
+                            </div>
+
+                            <!-- AI Model Selection -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">AI Model</label>
+                                <select wire:model="settings.openai_model" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Recommended)</option>
+                                    <option value="gpt-4">GPT-4 (More Advanced)</option>
+                                    <option value="gpt-4-turbo-preview">GPT-4 Turbo (Latest)</option>
+                                    <option value="gpt-3.5-turbo-16k">GPT-3.5 Turbo 16K (Long Context)</option>
+                                </select>
+                            </div>
+
+                            <!-- AI Settings Row -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Temperature</label>
+                                    <input type="number" wire:model="settings.ai_temperature" min="0" max="2" step="0.1"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                                    <p class="text-xs text-gray-500 mt-1">0 = Focused, 2 = Creative</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Tokens</label>
+                                    <input type="number" wire:model="settings.ai_max_tokens" min="50" max="4000" step="50"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                                    <p class="text-xs text-gray-500 mt-1">Response length limit</p>
+                                </div>
+                            </div>
+
+                            <!-- Custom System Prompt -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custom System Prompt (Optional)</label>
+                                <textarea wire:model="settings.ai_system_prompt" rows="4" 
+                                          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                          placeholder="Leave empty to use default prompt..."></textarea>
+                                <p class="text-xs text-gray-500 mt-1">Customize how the AI assistant behaves</p>
+                            </div>
+
+                            <!-- Direct Integration Options -->
+                            <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-3 border border-yellow-200 dark:border-yellow-700">
+                                <h4 class="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">⚡ Direct Google Sheets Integration</h4>
+                                <div class="space-y-2">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" wire:model="settings.direct_sheets_integration" class="mr-2">
+                                        <span class="text-sm text-yellow-700 dark:text-yellow-300">Read products directly from Google Sheets</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" wire:model="settings.bypass_local_database" class="mr-2">
+                                        <span class="text-sm text-yellow-700 dark:text-yellow-300">Bypass local database completely</span>
+                                    </label>
+                                </div>
+                                <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-2">⚠️ This will make responses slightly slower but always use live data</p>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
                 <!-- AI Recommendations -->
                 <div class="flex items-center justify-between">
                     <div>

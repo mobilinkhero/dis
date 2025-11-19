@@ -2,12 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\Tenant\EcommerceConfiguration;
 use App\Models\Tenant\Product;
 use App\Models\Tenant\Order;
-use App\Models\Tenant\Contact;
-use App\Models\Tenant\EcommerceConfiguration;
+use App\Models\Tenant\OrderItem;
 use App\Models\Tenant\EcommerceUserSession;
 use App\Services\EcommerceLogger;
+use App\Services\AiEcommerceService;
 use App\Traits\Ai;
 use App\Traits\WhatsApp;
 use Carbon\Carbon;
@@ -66,7 +67,54 @@ class EcommerceOrderService
 
             $this->currentContact = $contact;
             
-            // Get or create user session
+            // Check if AI-powered mode is enabled
+            if ($this->config->ai_powered_mode) {
+                EcommerceLogger::info('Using AI-powered mode for message processing', [
+                    'tenant_id' => $this->tenantId,
+                    'contact_phone' => $contact->phone
+                ]);
+                
+                $aiService = new AiEcommerceService($this->tenantId);
+                $aiResult = $aiService->processMessage($message, $contact);
+                
+                if ($aiResult['handled']) {
+                    // Execute any AI-generated actions
+                    if (!empty($aiResult['actions'])) {
+                        $aiService->executeActions($aiResult['actions']);
+                    }
+                    
+                    // Return AI response with buttons if provided
+                    $response = [
+                        'handled' => true,
+                        'response' => $aiResult['response']
+                    ];
+                    
+                    if (!empty($aiResult['buttons'])) {
+                        $response['message_data'] = [
+                            'reply_text' => $aiResult['response'],
+                            'bot_header' => 'AI Shopping Assistant',
+                            'bot_footer' => 'Powered by AI'
+                        ];
+                        
+                        // Add up to 3 buttons
+                        foreach ($aiResult['buttons'] as $index => $button) {
+                            if ($index < 3) {
+                                $buttonNum = $index + 1;
+                                $response['message_data']["button{$buttonNum}_id"] = $button['id'];
+                                $response['message_data']["button{$buttonNum}"] = $button['text'];
+                            }
+                        }
+                    }
+                    
+                    EcommerceLogger::botInteraction($contact->phone, $message, 'AI processed successfully');
+                    return $response;
+                }
+                
+                // If AI couldn't handle it, fall back to traditional flow
+                EcommerceLogger::info('AI mode failed, falling back to traditional flow');
+            }
+            
+            // Get or create user session (for non-AI mode)
             $this->currentSession = EcommerceUserSession::getOrCreate(
                 $this->tenantId,
                 $contact->id,
