@@ -212,26 +212,45 @@ class AiEcommerceService
                 'tenant_id' => $this->tenantId
             ]);
 
-            $serviceAccountService = app(GoogleSheetsServiceAccountService::class);
-            $serviceAccountStatus = $serviceAccountService->checkServiceAccountStatus($this->tenantId);
-
-            EcommerceLogger::info('🤖 AI-SHEETS: Service account status checked', [
+            // TEMPORARY FIX: Skip service account check and use public CSV directly
+            // This bypasses the hanging service account check
+            EcommerceLogger::info('🤖 AI-SHEETS: BYPASSING service account check, using public CSV directly', [
                 'tenant_id' => $this->tenantId,
-                'configured' => $serviceAccountStatus['configured'] ?? false,
-                'status_details' => $serviceAccountStatus
+                'reason' => 'service_account_check_hanging'
             ]);
 
-            if ($serviceAccountStatus['configured']) {
-                EcommerceLogger::info('🤖 AI-SHEETS: Using service account method', [
-                    'tenant_id' => $this->tenantId
+            return $this->fetchProductsPublic($sheetId);
+
+            /* COMMENTED OUT - CAUSING HANG
+            try {
+                $serviceAccountService = app(GoogleSheetsServiceAccountService::class);
+                $serviceAccountStatus = $serviceAccountService->checkServiceAccountStatus($this->tenantId);
+
+                EcommerceLogger::info('🤖 AI-SHEETS: Service account status checked', [
+                    'tenant_id' => $this->tenantId,
+                    'configured' => $serviceAccountStatus['configured'] ?? false,
+                    'status_details' => $serviceAccountStatus
                 ]);
-                return $this->fetchProductsWithServiceAccount($sheetId, $serviceAccountService);
-            } else {
-                EcommerceLogger::info('🤖 AI-SHEETS: Using public CSV method', [
-                    'tenant_id' => $this->tenantId
+
+                if ($serviceAccountStatus['configured']) {
+                    EcommerceLogger::info('🤖 AI-SHEETS: Using service account method', [
+                        'tenant_id' => $this->tenantId
+                    ]);
+                    return $this->fetchProductsWithServiceAccount($sheetId, $serviceAccountService);
+                } else {
+                    EcommerceLogger::info('🤖 AI-SHEETS: Using public CSV method', [
+                        'tenant_id' => $this->tenantId
+                    ]);
+                    return $this->fetchProductsPublic($sheetId);
+                }
+            } catch (\Exception $e) {
+                EcommerceLogger::error('🤖 AI-SHEETS: Service account check failed, falling back to public CSV', [
+                    'tenant_id' => $this->tenantId,
+                    'error' => $e->getMessage()
                 ]);
                 return $this->fetchProductsPublic($sheetId);
             }
+            */
 
         } catch (\Exception $e) {
             EcommerceLogger::error('🤖 AI-SHEETS: Exception in sheet data fetching', [
