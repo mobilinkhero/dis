@@ -7,52 +7,47 @@ use App\Services\AiEcommerceService;
 use App\Models\Tenant\EcommerceConfiguration;
 use App\Models\Contact;
 
-class TestAiEcommerce extends Command
+class TestAiEcommerceSimple extends Command
 {
     /**
      * The name and signature of the console command.
      */
-    protected $signature = 'ecommerce:test-ai {message} {--tenant=1} {--phone=1234567890}';
+    protected $signature = 'ai:test {message} {--tenant=1} {--phone=1234567890}';
 
     /**
      * The console command description.
      */
-    protected $description = 'Test AI-powered e-commerce bot with a sample message';
+    protected $description = 'Simple test for AI-powered e-commerce bot';
 
     /**
      * Execute the console command.
      */
     public function handle()
     {
-        $tenantId = $this->option('tenant');
+        $tenantId = (int) $this->option('tenant');
         $phone = $this->option('phone');
         $message = $this->argument('message');
 
-        // Initialize tenant context
         try {
-            $tenant = \App\Models\Tenant::find($tenantId);
-            if (!$tenant) {
-                $this->error("Tenant {$tenantId} not found");
-                return 1;
-            }
-
-            // Manually set tenant context for this command
-            session(['current_tenant_id' => $tenant->id]);
-            config(['app.current_tenant_id' => $tenant->id]);
-            
             $this->info("🤖 Testing AI E-commerce Bot");
             $this->info("Tenant: {$tenantId}");
             $this->info("Phone: {$phone}");
             $this->info("Message: {$message}");
             $this->info("----------------------------------------");
 
-            // Check AI configuration
+            // Check AI configuration directly
             $config = EcommerceConfiguration::where('tenant_id', $tenantId)->first();
             
             if (!$config) {
                 $this->error("❌ E-commerce not configured for tenant {$tenantId}");
                 return 1;
             }
+
+            $this->info("✅ E-commerce config found");
+            $this->line("  - AI Mode: " . ($config->ai_powered_mode ? 'Enabled' : 'Disabled'));
+            $this->line("  - API Key: " . (empty($config->openai_api_key) ? 'Not set' : 'Configured'));
+            $this->line("  - Model: " . ($config->openai_model ?: 'Not set'));
+            $this->line("  - Sheets URL: " . (empty($config->google_sheets_url) ? 'Not set' : 'Configured'));
 
             if (!$config->ai_powered_mode) {
                 $this->error("❌ AI mode is not enabled");
@@ -70,10 +65,7 @@ class TestAiEcommerce extends Command
                 return 1;
             }
 
-            $this->info("✅ AI Configuration validated");
-            $this->info("Model: " . ($config->openai_model ?: 'gpt-3.5-turbo'));
-            $this->info("Temperature: " . ($config->ai_temperature ?: 0.7));
-            $this->info("Direct Sheets: " . ($config->direct_sheets_integration ? 'Yes' : 'No'));
+            $this->info("----------------------------------------");
 
             // Create or get test contact
             $contact = Contact::firstOrCreate(
@@ -85,10 +77,10 @@ class TestAiEcommerce extends Command
                 ]
             );
 
-            $this->info("👤 Using contact: {$contact->firstname} {$contact->lastname} ({$contact->phone})");
+            $this->info("👤 Contact: {$contact->firstname} {$contact->lastname} ({$contact->phone})");
             $this->info("----------------------------------------");
 
-            // Test AI service
+            // Test AI service directly
             $aiService = new AiEcommerceService($tenantId);
             
             $this->info("🧠 Processing with AI...");
@@ -133,7 +125,11 @@ class TestAiEcommerce extends Command
 
         } catch (\Exception $e) {
             $this->error("❌ Error: " . $e->getMessage());
-            $this->error("Stack trace: " . $e->getTraceAsString());
+            
+            if ($this->option('verbose') || $this->option('debug')) {
+                $this->error("Stack trace: " . $e->getTraceAsString());
+            }
+            
             return 1;
         }
 
