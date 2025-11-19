@@ -75,13 +75,19 @@ class TestAiEcommerce extends Command
             $this->info("Temperature: " . ($config->ai_temperature ?: 0.7));
             $this->info("Direct Sheets: " . ($config->direct_sheets_integration ? 'Yes' : 'No'));
 
-            // Create or get test contact
-            $contact = Contact::firstOrCreate(
+            // Get tenant subdomain for proper table name
+            $tenantSubdomain = $tenant->subdomain;
+            
+            // Create or get test contact using proper fromTenant method
+            $contact = Contact::fromTenant($tenantSubdomain)->firstOrCreate(
                 ['phone' => $phone, 'tenant_id' => $tenantId],
                 [
                     'firstname' => 'Test',
                     'lastname' => 'Customer',
-                    'type' => 'guest'
+                    'type' => 'guest',
+                    'status_id' => 1, // Default status
+                    'source_id' => 1, // Default source
+                    'addedfrom' => 1 // Default user
                 ]
             );
 

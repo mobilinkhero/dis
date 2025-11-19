@@ -29,8 +29,15 @@ class TestAiEcommerceSimple extends Command
         $message = $this->argument('message');
 
         try {
+            // Get tenant info first
+            $tenant = \App\Models\Tenant::find($tenantId);
+            if (!$tenant) {
+                $this->error("Tenant {$tenantId} not found");
+                return 1;
+            }
+            
             $this->info("🤖 Testing AI E-commerce Bot");
-            $this->info("Tenant: {$tenantId}");
+            $this->info("Tenant: {$tenantId} ({$tenant->subdomain})");
             $this->info("Phone: {$phone}");
             $this->info("Message: {$message}");
             $this->info("----------------------------------------");
@@ -67,13 +74,16 @@ class TestAiEcommerceSimple extends Command
 
             $this->info("----------------------------------------");
 
-            // Create or get test contact
-            $contact = Contact::firstOrCreate(
+            // Create or get test contact using proper fromTenant method
+            $contact = Contact::fromTenant($tenant->subdomain)->firstOrCreate(
                 ['phone' => $phone, 'tenant_id' => $tenantId],
                 [
                     'firstname' => 'Test',
                     'lastname' => 'Customer',
-                    'type' => 'guest'
+                    'type' => 'guest',
+                    'status_id' => 1, // Default status
+                    'source_id' => 1, // Default source
+                    'addedfrom' => 1 // Default user
                 ]
             );
 
