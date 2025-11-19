@@ -87,8 +87,7 @@ class EcommerceConfiguration extends BaseModel
      */
     public function isFullyConfigured(): bool
     {
-        return $this->is_configured && 
-               $this->google_sheets_url;
+        return $this->is_configured;
     }
 
     /**

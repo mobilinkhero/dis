@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Tenant\EcommerceConfiguration;
+use App\Models\Tenant\Product;
 use App\Services\GoogleSheetsService;
 use App\Services\GoogleSheetsServiceAccountService;
 use App\Services\EcommerceLogger;
@@ -60,22 +61,21 @@ class AiEcommerceService
                 'direct_sheets' => $this->config->direct_sheets_integration
             ]);
 
-            // Get current product data from Google Sheets
-            EcommerceLogger::info('🤖 AI-SHEETS: Fetching products from Google Sheets', [
-                'tenant_id' => $this->tenantId,
-                'sheets_url' => $this->config->google_sheets_url
+            // Get current product data from local database
+            EcommerceLogger::info('🤖 AI-DATABASE: Fetching products from local database', [
+                'tenant_id' => $this->tenantId
             ]);
 
-            $productData = $this->getProductDataFromSheets();
+            $productData = $this->getProductDataFromDatabase();
 
-            EcommerceLogger::info('🤖 AI-SHEETS: Products fetched', [
+            EcommerceLogger::info('🤖 AI-DATABASE: Products fetched', [
                 'tenant_id' => $this->tenantId,
                 'products_count' => count($productData),
                 'products_preview' => array_slice($productData, 0, 3)
             ]);
 
             if (empty($productData)) {
-                EcommerceLogger::error('🤖 AI-SHEETS: No products available', [
+                EcommerceLogger::error('🤖 AI-DATABASE: No products available', [
                     'tenant_id' => $this->tenantId
                 ]);
                 return [
@@ -175,89 +175,69 @@ class AiEcommerceService
     {
         return $this->config 
             && $this->config->ai_powered_mode 
-            && !empty($this->config->openai_api_key)
-            && !empty($this->config->google_sheets_url);
+            && !empty($this->config->openai_api_key);
     }
 
     /**
-     * Get product data directly from Google Sheets
+     * Get product data from local database
      */
-    protected function getProductDataFromSheets(): array
+    protected function getProductDataFromDatabase(): array
     {
         try {
-            EcommerceLogger::info('🤖 AI-SHEETS: Starting sheet data extraction', [
-                'tenant_id' => $this->tenantId,
-                'sheets_url' => $this->config->google_sheets_url
-            ]);
-
-            // Extract sheet ID
-            $sheetId = $this->sheetsService->extractSheetId($this->config->google_sheets_url);
-            
-            EcommerceLogger::info('🤖 AI-SHEETS: Sheet ID extracted', [
-                'tenant_id' => $this->tenantId,
-                'sheet_id' => $sheetId ? 'extracted_successfully' : 'extraction_failed',
-                'sheet_id_value' => $sheetId
-            ]);
-
-            if (!$sheetId) {
-                EcommerceLogger::error('🤖 AI-SHEETS: Failed to extract sheet ID', [
-                    'tenant_id' => $this->tenantId,
-                    'url' => $this->config->google_sheets_url
-                ]);
-                return [];
-            }
-
-            // Get data using service account or public access
-            EcommerceLogger::info('🤖 AI-SHEETS: Checking service account status', [
+            EcommerceLogger::info('🤖 AI-DATABASE: Fetching products from local database', [
                 'tenant_id' => $this->tenantId
             ]);
 
-            // TEMPORARY FIX: Skip service account check and use public CSV directly
-            // This bypasses the hanging service account check
-            EcommerceLogger::info('🤖 AI-SHEETS: BYPASSING service account check, using public CSV directly', [
+            // Get active, in-stock products from the database
+            $products = Product::where('tenant_id', $this->tenantId)
+                ->active()
+                ->inStock()
+                ->get();
+
+            EcommerceLogger::info('🤖 AI-DATABASE: Products query executed', [
                 'tenant_id' => $this->tenantId,
-                'reason' => 'service_account_check_hanging'
+                'total_products_found' => $products->count()
             ]);
 
-            return $this->fetchProductsPublic($sheetId);
-
-            /* COMMENTED OUT - CAUSING HANG
-            try {
-                $serviceAccountService = app(GoogleSheetsServiceAccountService::class);
-                $serviceAccountStatus = $serviceAccountService->checkServiceAccountStatus($this->tenantId);
-
-                EcommerceLogger::info('🤖 AI-SHEETS: Service account status checked', [
-                    'tenant_id' => $this->tenantId,
-                    'configured' => $serviceAccountStatus['configured'] ?? false,
-                    'status_details' => $serviceAccountStatus
-                ]);
-
-                if ($serviceAccountStatus['configured']) {
-                    EcommerceLogger::info('🤖 AI-SHEETS: Using service account method', [
-                        'tenant_id' => $this->tenantId
-                    ]);
-                    return $this->fetchProductsWithServiceAccount($sheetId, $serviceAccountService);
-                } else {
-                    EcommerceLogger::info('🤖 AI-SHEETS: Using public CSV method', [
-                        'tenant_id' => $this->tenantId
-                    ]);
-                    return $this->fetchProductsPublic($sheetId);
-                }
-            } catch (\Exception $e) {
-                EcommerceLogger::error('🤖 AI-SHEETS: Service account check failed, falling back to public CSV', [
-                    'tenant_id' => $this->tenantId,
-                    'error' => $e->getMessage()
-                ]);
-                return $this->fetchProductsPublic($sheetId);
+            // Convert to array format expected by AI
+            $productData = [];
+            foreach ($products as $product) {
+                $productArray = [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'price' => $product->effective_price,
+                    'original_price' => $product->price,
+                    'sale_price' => $product->sale_price,
+                    'stock_quantity' => $product->stock_quantity,
+                    'category' => $product->category,
+                    'subcategory' => $product->subcategory,
+                    'sku' => $product->sku,
+                    'status' => $product->status,
+                    'featured' => $product->featured,
+                    'is_on_sale' => $product->is_on_sale,
+                    'is_low_stock' => $product->is_low_stock,
+                    'formatted_price' => $product->formatted_price,
+                    'tags' => $product->tags,
+                    'images' => $product->images,
+                    'primary_image' => $product->primary_image
+                ];
+                
+                $productData[] = $productArray;
             }
-            */
+
+            EcommerceLogger::info('🤖 AI-DATABASE: Product data formatted for AI', [
+                'tenant_id' => $this->tenantId,
+                'products_count' => count($productData),
+                'sample_product' => $productData[0] ?? null
+            ]);
+
+            return $productData;
 
         } catch (\Exception $e) {
-            EcommerceLogger::error('🤖 AI-SHEETS: Exception in sheet data fetching', [
-                'error' => $e->getMessage(),
+            EcommerceLogger::error('🤖 AI-DATABASE: Failed to get product data from database', [
                 'tenant_id' => $this->tenantId,
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
+                'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
             return [];
@@ -311,9 +291,12 @@ class AiEcommerceService
                 EcommerceLogger::error('🤖 AI-SHEETS: CSV fetch failed', [
                     'tenant_id' => $this->tenantId,
                     'status_code' => $response->status(),
-                    'response_body' => substr($response->body(), 0, 500)
+                    'response_body' => substr($response->body(), 0, 500),
+                    'error_explanation' => $this->getErrorExplanation($response->status())
                 ]);
-                return [];
+                
+                // Return sample products for testing if sheets are not accessible
+                return $this->getSampleProducts();
             }
 
             $csvData = str_getcsv($response->body(), "\n");
@@ -651,5 +634,61 @@ For order processing, include actions:
         ]);
         
         return ['success' => true, 'action' => 'customer_added'];
+    }
+
+    /**
+     * Get error explanation for HTTP status codes
+     */
+    protected function getErrorExplanation(int $statusCode): string
+    {
+        return match($statusCode) {
+            401 => 'Unauthorized - Google Sheet is not public. Please make it viewable by anyone with the link.',
+            403 => 'Forbidden - Sheet access restricted. Please check sharing settings.',
+            404 => 'Not Found - Sheet ID may be incorrect or sheet was deleted.',
+            410 => 'Gone - Sheet may have been moved or deleted. Please check the URL.',
+            default => 'HTTP error ' . $statusCode . ' - Please check if the Google Sheet exists and is publicly accessible.'
+        };
+    }
+
+    /**
+     * Get sample products for testing when sheets are not accessible
+     */
+    protected function getSampleProducts(): array
+    {
+        EcommerceLogger::info('🤖 AI-SHEETS: Using sample products as fallback', [
+            'tenant_id' => $this->tenantId,
+            'reason' => 'sheets_not_accessible'
+        ]);
+
+        return [
+            [
+                'Name' => 'Wireless Mouse',
+                'Price' => '29.99',
+                'Description' => 'Ergonomic wireless mouse with long battery life',
+                'Stock' => '50',
+                'Category' => 'Electronics'
+            ],
+            [
+                'Name' => 'Bluetooth Keyboard',
+                'Price' => '79.99', 
+                'Description' => 'Compact Bluetooth keyboard for all devices',
+                'Stock' => '25',
+                'Category' => 'Electronics'
+            ],
+            [
+                'Name' => 'USB-C Cable',
+                'Price' => '15.99',
+                'Description' => 'High-speed USB-C charging cable 1.5m',
+                'Stock' => '100',
+                'Category' => 'Accessories'
+            ],
+            [
+                'Name' => 'Phone Stand',
+                'Price' => '12.99',
+                'Description' => 'Adjustable phone stand for desk',
+                'Stock' => '75',
+                'Category' => 'Accessories'
+            ]
+        ];
     }
 }

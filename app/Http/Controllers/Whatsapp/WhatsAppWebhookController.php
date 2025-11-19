@@ -1003,7 +1003,10 @@ class WhatsAppWebhookController extends Controller
         }
         $buttonHtml .= '</div>';
 
-        MessageBot::where('id', $data['id'])->update(['sending_count' => $data['sending_count'] + 1]);
+        // Only update MessageBot if this is a regular bot message with an ID
+        if (isset($data['id'])) {
+            MessageBot::where('id', $data['id'])->update(['sending_count' => $data['sending_count'] + 1]);
+        }
 
         $buttondata = $buttonHtml == "<div class='flex flex-col mt-2 space-y-2'></div>" ? '' : $buttonHtml;
 
