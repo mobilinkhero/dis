@@ -355,7 +355,7 @@ class WhatsAppWebhookController extends Controller
                                         foreach ($buttons as $index => $button) {
                                             $buttonNum = $index + 1;
                                             $buttonMessage["button{$buttonNum}_id"] = $button['id'];
-                                            $buttonMessage["button{$buttonNum}"] = substr($button['title'], 0, 20);
+                                            $buttonMessage["button{$buttonNum}"] = substr($button['text'] ?? $button['title'] ?? 'Button', 0, 20);
                                         }
                                         
                                         EcommerceLogger::info('📞 WEBHOOK: Sending message with buttons', [
