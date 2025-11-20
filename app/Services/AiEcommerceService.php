@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Tenant\EcommerceConfiguration;
 use App\Models\Tenant\Product;
+use App\Models\Tenant\AiConversation;
 use App\Services\EcommerceLogger;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -79,29 +80,40 @@ class AiEcommerceService
                 ];
             }
 
-            // Create AI context
-            EcommerceLogger::info('🤖 AI-PROMPT: Building AI prompt', [
+            // Get or create conversation thread
+            EcommerceLogger::info('🤖 AI-THREAD: Getting conversation thread', [
                 'tenant_id' => $this->tenantId,
-                'message' => $message
+                'contact_id' => $contact->id,
+                'contact_phone' => $contact->phone
             ]);
 
             $systemPrompt = $this->buildSystemPrompt($productData, $contact);
+            $conversation = AiConversation::getOrCreate(
+                $this->tenantId, 
+                $contact->id, 
+                $contact->phone, 
+                $systemPrompt
+            );
 
-            EcommerceLogger::info('🤖 AI-PROMPT: Prompt built', [
+            EcommerceLogger::info('🤖 AI-THREAD: Conversation thread ready', [
                 'tenant_id' => $this->tenantId,
-                'prompt_length' => strlen($systemPrompt),
-                'prompt_preview' => substr($systemPrompt, 0, 200) . '...'
+                'thread_id' => $conversation->thread_id,
+                'message_count' => $conversation->message_count,
+                'is_new_conversation' => $conversation->wasRecentlyCreated
             ]);
 
-            // Get AI response
-            EcommerceLogger::info('🤖 AI-OPENAI: Calling OpenAI API', [
+            // Add user message to conversation
+            $conversation->addUserMessage($message);
+
+            // Call OpenAI with conversation context
+            EcommerceLogger::info('🤖 AI-OPENAI: Calling OpenAI API with thread context', [
                 'tenant_id' => $this->tenantId,
+                'thread_id' => $conversation->thread_id,
                 'model' => $this->config->openai_model,
-                'temperature' => $this->config->ai_temperature,
-                'max_tokens' => $this->config->ai_max_tokens
+                'total_messages' => $conversation->message_count
             ]);
 
-            $aiResponse = $this->callOpenAI($systemPrompt, $message);
+            $aiResponse = $this->callOpenAIWithConversation($conversation);
 
             EcommerceLogger::info('🤖 AI-OPENAI: OpenAI response received', [
                 'tenant_id' => $this->tenantId,
@@ -128,8 +140,12 @@ class AiEcommerceService
 
             $parsedResponse = $this->parseAiResponse($aiResponse);
 
+            // Save AI response to conversation
+            $conversation->addAiResponse($aiResponse);
+
             EcommerceLogger::info('🤖 AI-PARSE: AI response parsed', [
                 'tenant_id' => $this->tenantId,
+                'thread_id' => $conversation->thread_id,
                 'type' => $parsedResponse['type'] ?? 'unknown',
                 'response_length' => strlen($parsedResponse['message'] ?? ''),
                 'has_buttons' => !empty($parsedResponse['buttons']),
@@ -329,7 +345,57 @@ IMPORTANT: If you are showing any products, you MUST respond with JSON format th
     }
 
     /**
-     * Call OpenAI API
+     * Call OpenAI API with conversation context (COST EFFICIENT)
+     */
+    protected function callOpenAIWithConversation(AiConversation $conversation): string
+    {
+        $apiKey = $this->config->openai_api_key;
+        $model = $this->config->openai_model ?: 'gpt-3.5-turbo';
+        $temperature = (float) ($this->config->ai_temperature ?: 0.7);
+        $maxTokens = (int) ($this->config->ai_max_tokens ?: 500);
+
+        // Get conversation messages (includes system prompt + history)
+        $messages = $conversation->getMessagesForApi();
+
+        EcommerceLogger::info('🤖 AI-CONTEXT: Sending conversation to OpenAI', [
+            'tenant_id' => $this->tenantId,
+            'thread_id' => $conversation->thread_id,
+            'total_messages' => count($messages),
+            'system_prompt_included' => isset($messages[0]) && $messages[0]['role'] === 'system'
+        ]);
+
+        $response = Http::withToken($apiKey)
+            ->timeout(30)
+            ->post('https://api.openai.com/v1/chat/completions', [
+                'model' => $model,
+                'messages' => $messages,
+                'temperature' => $temperature,
+                'max_tokens' => $maxTokens
+            ]);
+
+        if (!$response->successful()) {
+            throw new \Exception('OpenAI API request failed: ' . $response->body());
+        }
+
+        $data = $response->json();
+        $aiResponse = $data['choices'][0]['message']['content'] ?? '';
+        
+        // Track token usage if available
+        $tokensUsed = $data['usage']['total_tokens'] ?? 0;
+        if ($tokensUsed > 0) {
+            EcommerceLogger::info('🤖 AI-TOKENS: Token usage tracked', [
+                'tenant_id' => $this->tenantId,
+                'thread_id' => $conversation->thread_id,
+                'tokens_used' => $tokensUsed,
+                'total_conversation_tokens' => $conversation->total_tokens_used + $tokensUsed
+            ]);
+        }
+
+        return $aiResponse;
+    }
+
+    /**
+     * Legacy method - Call OpenAI API (DEPRECATED - Use conversation method instead)
      */
     protected function callOpenAI(string $systemPrompt, string $userMessage): string
     {
