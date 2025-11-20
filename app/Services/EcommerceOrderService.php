@@ -91,8 +91,8 @@ class EcommerceOrderService
             ]);
             
             try {
-                $aiService = new AiEcommerceService($this->tenantId);
-                $aiResult = $aiService->processMessage($message, $contact);
+                $aiService = new AdvancedAiEcommerceService($this->tenantId);
+                $aiResult = $aiService->processAdvancedMessage($message, $contact);
                 
                 EcommerceLogger::info('🤖 AI-RESPONSE: Received AI result', [
                     'tenant_id' => $this->tenantId,
