@@ -107,7 +107,8 @@ class AiEcommerceService
                 'tenant_id' => $this->tenantId,
                 'response_received' => !empty($aiResponse),
                 'response_length' => strlen($aiResponse ?? ''),
-                'response_preview' => substr($aiResponse ?? '', 0, 200) . '...'
+                'response_preview' => substr($aiResponse ?? '', 0, 200) . '...',
+                'full_response' => $aiResponse // Log full response to debug format
             ]);
 
             if (!$aiResponse) {
@@ -129,9 +130,10 @@ class AiEcommerceService
 
             EcommerceLogger::info('🤖 AI-PARSE: AI response parsed', [
                 'tenant_id' => $this->tenantId,
-                'handled' => $parsedResponse['handled'] ?? false,
-                'response_length' => strlen($parsedResponse['response'] ?? ''),
+                'type' => $parsedResponse['type'] ?? 'unknown',
+                'response_length' => strlen($parsedResponse['message'] ?? ''),
                 'has_buttons' => !empty($parsedResponse['buttons']),
+                'button_count' => count($parsedResponse['buttons'] ?? []),
                 'has_actions' => !empty($parsedResponse['actions']),
                 'full_parsed_response' => $parsedResponse
             ]);
@@ -292,33 +294,47 @@ CUSTOMER DETAILS POLICY:
 INSTRUCTIONS:
 1. Be friendly, helpful, and conversational
 2. Help customers find products by understanding their needs
-3. Show product details with prices in {currency}
-4. Create WhatsApp buttons for actions (Buy Now, View More, etc.)
-5. Guide customers through the purchase process
-6. Collect required customer details when needed
-7. Present available payment methods
-8. Keep responses concise and mobile-friendly
+3. Show product details with clean formatting (minimal use of asterisks)
+4. Use emojis for visual appeal instead of excessive formatting
+5. Create interactive buttons for product actions
+6. Keep responses concise and mobile-friendly
+
+FORMATTING RULES:
+- Use emojis for bullets: 📦 for products, 💰 for price, 📋 for description
+- Only use *asterisks* for product names, avoid for labels like Price, Description
+- Use clean, readable text format
+- When showing multiple products, use numbered lists
+
+GOOD EXAMPLE:
+\"Here are the jeans available:
+
+1. *Slim Fit Blue Jeans*
+💰 \$30
+📋 Comfortable slim fit blue jeans for everyday wear
+📦 Available in all sizes
+
+2. *Distressed Denim Jeans*  
+💰 \$35
+📋 Trendy distressed denim jeans for a stylish look
+📦 Limited stock available
+
+Which one interests you?\"
 
 RESPONSE FORMAT:
-For text responses, just return the message.
+For simple text: return clean formatted message like above.
 
-For responses with buttons, use this JSON format:
+For responses with buttons, return EXACT JSON:
 {
-  \"message\": \"Your message here\",
+  \"message\": \"Here are the available jeans:\\n\\n1. *Slim Fit Blue Jeans*\\n💰 \$30\\n📋 Comfortable and stylish\\n\\n2. *Distressed Denim*\\n💰 \$35\\n📋 Trendy design\\n\\nWhich interests you?\",
   \"buttons\": [
-    {\"id\": \"action_productid\", \"text\": \"Button Text\"}
+    {\"id\": \"buy_1\", \"text\": \"🛒 Buy Slim Fit\"},
+    {\"id\": \"buy_2\", \"text\": \"🛒 Buy Distressed\"},
+    {\"id\": \"info_more\", \"text\": \"ℹ️ More Info\"}
   ],
   \"type\": \"interactive\"
 }
 
-For order processing, include actions:
-{
-  \"message\": \"Order confirmed!\",
-  \"actions\": [
-    {\"type\": \"create_order\", \"data\": {...}},
-    {\"type\": \"update_stock\", \"data\": {...}}
-  ]
-}
+CRITICAL: Return ONLY JSON when buttons needed, no mixed text+JSON.
         ";
     }
 
@@ -361,6 +377,14 @@ For order processing, include actions:
         $jsonData = json_decode($aiResponse, true);
         
         if (json_last_error() === JSON_ERROR_NONE && is_array($jsonData)) {
+            EcommerceLogger::info('🤖 AI-JSON: Successfully parsed JSON response', [
+                'tenant_id' => $this->tenantId,
+                'has_message' => !empty($jsonData['message']),
+                'has_buttons' => !empty($jsonData['buttons']),
+                'button_count' => count($jsonData['buttons'] ?? []),
+                'buttons_preview' => $jsonData['buttons'] ?? []
+            ]);
+            
             return [
                 'type' => $jsonData['type'] ?? 'interactive',
                 'message' => $jsonData['message'] ?? $aiResponse,
@@ -368,6 +392,11 @@ For order processing, include actions:
                 'actions' => $jsonData['actions'] ?? []
             ];
         }
+
+        EcommerceLogger::info('🤖 AI-TEXT: Using plain text response (not JSON)', [
+            'tenant_id' => $this->tenantId,
+            'response_preview' => substr($aiResponse, 0, 100) . '...'
+        ]);
 
         // Return as plain text response
         return [
