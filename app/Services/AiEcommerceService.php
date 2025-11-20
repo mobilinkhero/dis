@@ -292,49 +292,39 @@ CUSTOMER DETAILS POLICY:
 {collection_policy}
 
 INSTRUCTIONS:
-1. Be friendly, helpful, and conversational
+1. Be friendly, helpful, and conversational  
 2. Help customers find products by understanding their needs
-3. Show product details with clean formatting (minimal use of asterisks)
-4. Use emojis for visual appeal instead of excessive formatting
-5. Create interactive buttons for product actions
-6. Keep responses concise and mobile-friendly
+3. Show product details with clean formatting (minimal asterisks)
+4. Use emojis for visual appeal: 💰 price, 📋 description, 📦 stock
+5. When showing products, ALWAYS include interactive buttons
+6. Keep responses mobile-friendly
 
 FORMATTING RULES:
-- Use emojis for bullets: 📦 for products, 💰 for price, 📋 for description
-- Only use *asterisks* for product names, avoid for labels like Price, Description
-- Use clean, readable text format
-- When showing multiple products, use numbered lists
+- Clean product lists with emojis, minimal asterisks
+- Only use *asterisks* for product names  
+- Use numbered lists for multiple products
 
-GOOD EXAMPLE:
-\"Here are the jeans available:
+CRITICAL RESPONSE FORMAT:
+When showing products, you MUST return JSON format with buttons:
 
-1. *Slim Fit Blue Jeans*
-💰 \$30
-📋 Comfortable slim fit blue jeans for everyday wear
-📦 Available in all sizes
-
-2. *Distressed Denim Jeans*  
-💰 \$35
-📋 Trendy distressed denim jeans for a stylish look
-📦 Limited stock available
-
-Which one interests you?\"
-
-RESPONSE FORMAT:
-For simple text: return clean formatted message like above.
-
-For responses with buttons, return EXACT JSON:
 {
-  \"message\": \"Here are the available jeans:\\n\\n1. *Slim Fit Blue Jeans*\\n💰 \$30\\n📋 Comfortable and stylish\\n\\n2. *Distressed Denim*\\n💰 \$35\\n📋 Trendy design\\n\\nWhich interests you?\",
+  \"message\": \"Sure! Here are the jeans available:\\n\\n1. *Slim Fit Blue Jeans*\\n💰 \$30\\n📋 Comfortable slim fit for everyday wear\\n📦 Available in all sizes\\n\\n2. *Distressed Denim Jeans*\\n💰 \$35\\n📋 Trendy distressed design\\n📦 Limited stock\\n\\nWhich one interests you?\",
   \"buttons\": [
-    {\"id\": \"buy_1\", \"text\": \"🛒 Buy Slim Fit\"},
-    {\"id\": \"buy_2\", \"text\": \"🛒 Buy Distressed\"},
-    {\"id\": \"info_more\", \"text\": \"ℹ️ More Info\"}
+    {\"id\": \"buy_jeans001\", \"text\": \"🛒 Buy Slim Fit\"},
+    {\"id\": \"buy_jeans002\", \"text\": \"🛒 Buy Distressed\"},
+    {\"id\": \"info_jeans\", \"text\": \"ℹ️ More Info\"}
   ],
   \"type\": \"interactive\"
 }
 
-CRITICAL: Return ONLY JSON when buttons needed, no mixed text+JSON.
+MANDATORY RULES:
+- NEVER use [BUTTONS:...] text format
+- ALWAYS return valid JSON when showing products
+- Include buy buttons for each product
+- Use product IDs in button IDs (buy_productid)
+- Return ONLY the JSON object, no extra text
+
+IMPORTANT: If you are showing any products, you MUST respond with JSON format that starts with { and ends with }. Do not return plain text when products are involved.
         ";
     }
 
@@ -393,7 +383,49 @@ CRITICAL: Return ONLY JSON when buttons needed, no mixed text+JSON.
             ];
         }
 
-        EcommerceLogger::info('🤖 AI-TEXT: Using plain text response (not JSON)', [
+        // Check if response contains [BUTTONS:...] format (fallback parsing)
+        if (preg_match_all('/\[BUTTONS:([^\]]+)\]/', $aiResponse, $matches)) {
+            EcommerceLogger::info('🤖 AI-FALLBACK: Found button tags in text, converting to buttons', [
+                'tenant_id' => $this->tenantId,
+                'button_tags_found' => $matches[1],
+                'total_buttons' => count($matches[1])
+            ]);
+            
+            // Remove button tags from message
+            $cleanMessage = preg_replace('/\[BUTTONS:[^\]]+\]/', '', $aiResponse);
+            $cleanMessage = trim($cleanMessage);
+            
+            // Generate buttons from tags with smarter text
+            $buttons = [];
+            foreach ($matches[1] as $index => $buttonId) {
+                // Create smarter button text based on product ID
+                $buttonText = '🛒 Buy Now';
+                if (strpos($buttonId, 'pen') !== false) {
+                    $buttonText = '🖊️ Buy Pen';
+                } elseif (strpos($buttonId, 'jeans') !== false) {
+                    $buttonText = '👖 Buy Jeans';
+                } elseif (strpos($buttonId, 'info') !== false) {
+                    $buttonText = 'ℹ️ More Info';
+                }
+                
+                $buttons[] = [
+                    'id' => 'buy_' . $buttonId,
+                    'text' => $buttonText
+                ];
+                
+                // Limit to 3 buttons (WhatsApp limit)
+                if (count($buttons) >= 3) break;
+            }
+            
+            return [
+                'type' => 'interactive',
+                'message' => $cleanMessage,
+                'buttons' => $buttons,
+                'actions' => []
+            ];
+        }
+        
+        EcommerceLogger::info('🤖 AI-TEXT: Using plain text response (no JSON, no buttons)', [
             'tenant_id' => $this->tenantId,
             'response_preview' => substr($aiResponse, 0, 100) . '...'
         ]);
