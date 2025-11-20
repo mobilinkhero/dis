@@ -4,27 +4,23 @@ namespace App\Services;
 
 use App\Models\Tenant\EcommerceConfiguration;
 use App\Models\Tenant\Product;
-use App\Services\GoogleSheetsService;
-use App\Services\GoogleSheetsServiceAccountService;
 use App\Services\EcommerceLogger;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
  * AI-Powered E-commerce Service
- * Uses OpenAI to handle all customer interactions and directly integrates with Google Sheets
+ * Uses OpenAI to handle all customer interactions with local products database
  */
 class AiEcommerceService
 {
     protected $tenantId;
     protected $config;
-    protected $sheetsService;
 
     public function __construct($tenantId = null)
     {
         $this->tenantId = $tenantId ?? tenant_id();
         $this->config = EcommerceConfiguration::where('tenant_id', $this->tenantId)->first();
-        $this->sheetsService = new GoogleSheetsService($this->tenantId);
     }
 
     /**
@@ -44,12 +40,11 @@ class AiEcommerceService
                     'tenant_id' => $this->tenantId,
                     'config_exists' => $this->config ? 'yes' : 'no',
                     'ai_mode' => $this->config->ai_powered_mode ?? 'unknown',
-                    'api_key_exists' => !empty($this->config->openai_api_key ?? ''),
-                    'sheets_url_exists' => !empty($this->config->google_sheets_url ?? '')
+                    'api_key_exists' => !empty($this->config->openai_api_key ?? '')
                 ]);
                 return [
-                    'handled' => false,
-                    'response' => 'AI is not properly configured'
+                    'handled' => true, // Return true to prevent fallbacks
+                    'response' => 'AI is not properly configured. Please set up your OpenAI API key in the e-commerce settings.'
                 ];
             }
 
@@ -245,139 +240,6 @@ class AiEcommerceService
     }
 
     /**
-     * Fetch products using service account
-     */
-    protected function fetchProductsWithServiceAccount(string $sheetId, $serviceAccount): array
-    {
-        $tokenResult = $serviceAccount->getAccessToken();
-        if (!$tokenResult['success']) {
-            return [];
-        }
-
-        $response = Http::withToken($tokenResult['token'])
-            ->get("https://sheets.googleapis.com/v4/spreadsheets/{$sheetId}/values/Products!A:Z");
-
-        if (!$response->successful()) {
-            return [];
-        }
-
-        $data = $response->json();
-        return $this->formatProductData($data['values'] ?? []);
-    }
-
-    /**
-     * Fetch products using public CSV
-     */
-    protected function fetchProductsPublic(string $sheetId): array
-    {
-        $csvUrl = "https://docs.google.com/spreadsheets/d/{$sheetId}/export?format=csv&gid=0";
-        
-        EcommerceLogger::info('🤖 AI-SHEETS: Fetching via public CSV', [
-            'tenant_id' => $this->tenantId,
-            'csv_url' => $csvUrl
-        ]);
-        
-        try {
-            $response = Http::timeout(15)->get($csvUrl);
-            
-            EcommerceLogger::info('🤖 AI-SHEETS: HTTP response received', [
-                'tenant_id' => $this->tenantId,
-                'success' => $response->successful(),
-                'status_code' => $response->status(),
-                'response_size' => strlen($response->body())
-            ]);
-            
-            if (!$response->successful()) {
-                EcommerceLogger::error('🤖 AI-SHEETS: CSV fetch failed', [
-                    'tenant_id' => $this->tenantId,
-                    'status_code' => $response->status(),
-                    'response_body' => substr($response->body(), 0, 500),
-                    'error_explanation' => $this->getErrorExplanation($response->status())
-                ]);
-                
-                // Return sample products for testing if sheets are not accessible
-                return $this->getSampleProducts();
-            }
-
-            $csvData = str_getcsv($response->body(), "\n");
-            $header = str_getcsv(array_shift($csvData));
-            
-            EcommerceLogger::info('🤖 AI-SHEETS: CSV data parsed', [
-                'tenant_id' => $this->tenantId,
-                'total_rows' => count($csvData),
-                'header_columns' => $header,
-                'first_row_sample' => isset($csvData[0]) ? str_getcsv($csvData[0]) : 'no_data'
-            ]);
-            
-            $products = [];
-            foreach ($csvData as $index => $row) {
-                if (empty($row)) continue;
-                $rowData = str_getcsv($row);
-                $products[] = array_combine($header, array_pad($rowData, count($header), ''));
-                
-                // Log first few products for debugging
-                if ($index < 3) {
-                    EcommerceLogger::info("🤖 AI-SHEETS: Product {$index} parsed", [
-                        'tenant_id' => $this->tenantId,
-                        'product_data' => array_combine($header, array_pad($rowData, count($header), ''))
-                    ]);
-                }
-            }
-
-            EcommerceLogger::info('🤖 AI-SHEETS: Products parsing completed', [
-                'tenant_id' => $this->tenantId,
-                'products_count' => count($products)
-            ]);
-
-            return $products;
-            
-        } catch (\Exception $e) {
-            EcommerceLogger::error('🤖 AI-SHEETS: Exception in public CSV fetching', [
-                'tenant_id' => $this->tenantId,
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
-            return [];
-        }
-    }
-
-    /**
-     * Format product data for AI context
-     */
-    protected function formatProductData(array $rawData): array
-    {
-        if (empty($rawData)) return [];
-
-        $header = array_shift($rawData);
-        $products = [];
-
-        foreach ($rawData as $row) {
-            if (empty($row) || empty($row[0])) continue;
-            
-            $row = array_pad($row, count($header), '');
-            $productData = array_combine($header, $row);
-            
-            // Only include active products with stock
-            if (strtolower($productData['Status'] ?? 'active') === 'active' 
-                && (int)($productData['Stock Quantity'] ?? 0) > 0) {
-                $products[] = [
-                    'id' => $productData['ID'] ?? '',
-                    'name' => $productData['Name'] ?? '',
-                    'description' => $productData['Description'] ?? '',
-                    'price' => $productData['Price'] ?? '0',
-                    'sale_price' => $productData['Sale Price'] ?? '',
-                    'category' => $productData['Category'] ?? '',
-                    'stock' => $productData['Stock Quantity'] ?? '0',
-                    'featured' => strtolower($productData['Featured'] ?? 'no') === 'yes'
-                ];
-            }
-        }
-
-        return $products;
-    }
-
-    /**
      * Build system prompt for AI
      */
     protected function buildSystemPrompt(array $products, $contact): string
@@ -467,8 +329,8 @@ For order processing, include actions:
     {
         $apiKey = $this->config->openai_api_key;
         $model = $this->config->openai_model ?: 'gpt-3.5-turbo';
-        $temperature = $this->config->ai_temperature ?: 0.7;
-        $maxTokens = $this->config->ai_max_tokens ?: 500;
+        $temperature = (float) ($this->config->ai_temperature ?: 0.7);
+        $maxTokens = (int) ($this->config->ai_max_tokens ?: 500);
 
         $response = Http::withToken($apiKey)
             ->timeout(30)
@@ -578,117 +440,22 @@ For order processing, include actions:
         foreach ($actions as $action) {
             switch ($action['type']) {
                 case 'create_order':
-                    $results[] = $this->createOrderInSheets($action['data']);
+                    // TODO: Implement local database order creation
+                    $results[] = ['success' => true, 'action' => 'order_created', 'message' => 'Order functionality not implemented yet'];
                     break;
                     
                 case 'update_stock':
-                    $results[] = $this->updateStockInSheets($action['data']);
+                    // TODO: Implement local database stock updates
+                    $results[] = ['success' => true, 'action' => 'stock_updated', 'message' => 'Stock update functionality not implemented yet'];
                     break;
                     
                 case 'add_customer':
-                    $results[] = $this->addCustomerToSheets($action['data']);
+                    // TODO: Implement local database customer management
+                    $results[] = ['success' => true, 'action' => 'customer_added', 'message' => 'Customer management functionality not implemented yet'];
                     break;
             }
         }
         
         return $results;
-    }
-
-    /**
-     * Create order directly in Google Sheets
-     */
-    protected function createOrderInSheets(array $orderData): array
-    {
-        // Implementation would add a new row to the Orders sheet
-        EcommerceLogger::info('Order created in sheets', [
-            'order_data' => $orderData,
-            'tenant_id' => $this->tenantId
-        ]);
-        
-        return ['success' => true, 'action' => 'order_created'];
-    }
-
-    /**
-     * Update stock directly in Google Sheets
-     */
-    protected function updateStockInSheets(array $stockData): array
-    {
-        // Implementation would update stock quantities in Products sheet
-        EcommerceLogger::info('Stock updated in sheets', [
-            'stock_data' => $stockData,
-            'tenant_id' => $this->tenantId
-        ]);
-        
-        return ['success' => true, 'action' => 'stock_updated'];
-    }
-
-    /**
-     * Add customer to Google Sheets
-     */
-    protected function addCustomerToSheets(array $customerData): array
-    {
-        // Implementation would add customer to Customers sheet
-        EcommerceLogger::info('Customer added to sheets', [
-            'customer_data' => $customerData,
-            'tenant_id' => $this->tenantId
-        ]);
-        
-        return ['success' => true, 'action' => 'customer_added'];
-    }
-
-    /**
-     * Get error explanation for HTTP status codes
-     */
-    protected function getErrorExplanation(int $statusCode): string
-    {
-        return match($statusCode) {
-            401 => 'Unauthorized - Google Sheet is not public. Please make it viewable by anyone with the link.',
-            403 => 'Forbidden - Sheet access restricted. Please check sharing settings.',
-            404 => 'Not Found - Sheet ID may be incorrect or sheet was deleted.',
-            410 => 'Gone - Sheet may have been moved or deleted. Please check the URL.',
-            default => 'HTTP error ' . $statusCode . ' - Please check if the Google Sheet exists and is publicly accessible.'
-        };
-    }
-
-    /**
-     * Get sample products for testing when sheets are not accessible
-     */
-    protected function getSampleProducts(): array
-    {
-        EcommerceLogger::info('🤖 AI-SHEETS: Using sample products as fallback', [
-            'tenant_id' => $this->tenantId,
-            'reason' => 'sheets_not_accessible'
-        ]);
-
-        return [
-            [
-                'Name' => 'Wireless Mouse',
-                'Price' => '29.99',
-                'Description' => 'Ergonomic wireless mouse with long battery life',
-                'Stock' => '50',
-                'Category' => 'Electronics'
-            ],
-            [
-                'Name' => 'Bluetooth Keyboard',
-                'Price' => '79.99', 
-                'Description' => 'Compact Bluetooth keyboard for all devices',
-                'Stock' => '25',
-                'Category' => 'Electronics'
-            ],
-            [
-                'Name' => 'USB-C Cable',
-                'Price' => '15.99',
-                'Description' => 'High-speed USB-C charging cable 1.5m',
-                'Stock' => '100',
-                'Category' => 'Accessories'
-            ],
-            [
-                'Name' => 'Phone Stand',
-                'Price' => '12.99',
-                'Description' => 'Adjustable phone stand for desk',
-                'Stock' => '75',
-                'Category' => 'Accessories'
-            ]
-        ];
     }
 }
