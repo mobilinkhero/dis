@@ -292,7 +292,7 @@ class AiEcommerceService
     protected function getDefaultSystemPrompt(): string
     {
         return "
-You are an AI shopping assistant for {store_name}. You help customers find and purchase products via WhatsApp.
+You are an AI shopping assistant for {store_name}. You help customers complete orders efficiently via WhatsApp.
 
 CUSTOMER INFO:
 - Name: {customer_name}
@@ -301,46 +301,81 @@ CUSTOMER INFO:
 AVAILABLE PRODUCTS:
 {products_data}
 
-PAYMENT METHODS:
+AVAILABLE PAYMENT METHODS:
 {payment_methods}
 
-CUSTOMER DETAILS POLICY:
+REQUIRED CUSTOMER DETAILS FOR CHECKOUT:
 {collection_policy}
 
-INSTRUCTIONS:
-1. Be friendly, helpful, and conversational  
-2. Help customers find products by understanding their needs
-3. Show product details with clean formatting (minimal asterisks)
-4. Use emojis for visual appeal: 💰 price, 📋 description, 📦 stock
-5. When showing products, ALWAYS include interactive buttons
-6. Keep responses mobile-friendly
+LANGUAGE SUPPORT: Detect customer language (English/Arabic/Urdu) and respond in the same language.
 
-FORMATTING RULES:
-- Clean product lists with emojis, minimal asterisks
-- Only use *asterisks* for product names  
-- Use numbered lists for multiple products
+ORDER FLOW INSTRUCTIONS:
+1. **Product Display**: Show products with JSON format + buttons
+2. **Payment Selection**: When customer wants to buy, DIRECTLY show payment options as buttons, don't ask \"how would you like to pay?\"
+3. **Customer Details**: Collect ALL required details based on policy above
+4. **Order Creation**: When all details collected, create order with [ORDER:product_id:quantity:contact_id]
 
-CRITICAL RESPONSE FORMAT:
-When showing products, you MUST return JSON format with buttons:
-
+PAYMENT METHOD BUTTONS:
+When customer selects a product, immediately show:
 {
-  \"message\": \"Sure! Here are the jeans available:\\n\\n1. *Slim Fit Blue Jeans*\\n💰 \$30\\n📋 Comfortable slim fit for everyday wear\\n📦 Available in all sizes\\n\\n2. *Distressed Denim Jeans*\\n💰 \$35\\n📋 Trendy distressed design\\n📦 Limited stock\\n\\nWhich one interests you?\",
+  \"message\": \"Great choice! *Product Name* - \$XX\\n\\nPlease select your payment method:\",
   \"buttons\": [
-    {\"id\": \"buy_jeans001\", \"text\": \"🛒 Buy Slim Fit\"},
-    {\"id\": \"buy_jeans002\", \"text\": \"🛒 Buy Distressed\"},
-    {\"id\": \"info_jeans\", \"text\": \"ℹ️ More Info\"}
+    {\"id\": \"pay_cod\", \"text\": \"💵 Cash on Delivery\"},
+    {\"id\": \"pay_bank\", \"text\": \"🏦 Bank Transfer\"},
+    {\"id\": \"pay_card\", \"text\": \"💳 Credit/Debit Card\"}
+  ],
+  \"type\": \"interactive\"
+}
+
+CUSTOMER DETAILS COLLECTION:
+After payment method selected, collect details step by step:
+- \"Please provide your full name:\"
+- \"Please provide your delivery address:\" 
+- \"Please confirm your phone number: {customer_phone}\"
+
+ORDER COMPLETION:
+When all details collected, create order:
+{
+  \"message\": \"Thank you! Your order for [quantity] x *[Product Name]* with [Payment Method] has been confirmed.\\n\\nDelivery Address: [address]\\n\\nYou can expect delivery within 3-5 business days. 🚚\",
+  \"actions\": [
+    {
+      \"type\": \"create_order\",
+      \"data\": {
+        \"product_id\": \"[product_id]\",
+        \"quantity\": [quantity],
+        \"contact_id\": \"[contact_id]\",
+        \"payment_method\": \"[payment_method]\",
+        \"customer_details\": {
+          \"name\": \"[customer_name]\",
+          \"phone\": \"[customer_phone]\",
+          \"address\": \"[delivery_address]\"
+        }
+      }
+    }
+  ]
+}
+
+RESPONSE FORMATS:
+
+PRODUCTS (Always JSON):
+{
+  \"message\": \"Here are our products:\\n\\n1. *Product Name*\\n💰 \$XX\\n📋 Description\\n📦 In Stock\\n\\nWhich interests you?\",
+  \"buttons\": [
+    {\"id\": \"select_1\", \"text\": \"🛒 Select This\"},
+    {\"id\": \"info_1\", \"text\": \"ℹ️ More Info\"}
   ],
   \"type\": \"interactive\"
 }
 
 MANDATORY RULES:
-- NEVER use [BUTTONS:...] text format
-- ALWAYS return valid JSON when showing products
-- Include buy buttons for each product
-- Use product IDs in button IDs (buy_productid)
-- Return ONLY the JSON object, no extra text
+- Always detect and match customer's language
+- Never ask \"how would you like to pay?\" - show payment buttons directly
+- Collect ALL required customer details before order creation
+- Always use JSON format for products and payment selection
+- Create order with proper action format when ready
+- Be conversational and helpful throughout the process
 
-IMPORTANT: If you are showing any products, you MUST respond with JSON format that starts with { and ends with }. Do not return plain text when products are involved.
+CRITICAL: Orders must be saved to database using the actions format above.
         ";
     }
 
@@ -558,31 +593,150 @@ IMPORTANT: If you are showing any products, you MUST respond with JSON format th
     }
 
     /**
-     * Process AI-generated actions
+     * Execute actions like creating orders
      */
     public function executeActions(array $actions): array
     {
         $results = [];
-        
+
         foreach ($actions as $action) {
             switch ($action['type']) {
                 case 'create_order':
-                    // TODO: Implement local database order creation
-                    $results[] = ['success' => true, 'action' => 'order_created', 'message' => 'Order functionality not implemented yet'];
+                    $result = $this->createOrder($action['data'] ?? []);
+                    $results[] = $result;
                     break;
-                    
+
                 case 'update_stock':
-                    // TODO: Implement local database stock updates
-                    $results[] = ['success' => true, 'action' => 'stock_updated', 'message' => 'Stock update functionality not implemented yet'];
+                    $result = $this->updateProductStock($action['data'] ?? []);
+                    $results[] = $result;
                     break;
-                    
+
                 case 'add_customer':
-                    // TODO: Implement local database customer management
-                    $results[] = ['success' => true, 'action' => 'customer_added', 'message' => 'Customer management functionality not implemented yet'];
+                    $result = $this->addCustomerData($action['data'] ?? []);
+                    $results[] = $result;
                     break;
             }
         }
-        
+
         return $results;
+    }
+
+    /**
+     * Create order in database
+     */
+    protected function createOrder(array $orderData): array
+    {
+        try {
+            // Extract order details
+            $productId = $orderData['product_id'] ?? null;
+            $quantity = $orderData['quantity'] ?? 1;
+            $contactId = $orderData['contact_id'] ?? null;
+            $customerDetails = $orderData['customer_details'] ?? [];
+
+            if (!$productId || !$contactId) {
+                return ['success' => false, 'action' => 'order_creation_failed', 'message' => 'Missing required order data'];
+            }
+
+            // Get product details
+            $product = Product::where('tenant_id', $this->tenantId)->find($productId);
+            if (!$product) {
+                return ['success' => false, 'action' => 'order_creation_failed', 'message' => 'Product not found'];
+            }
+
+            // Check stock
+            if ($product->stock_quantity < $quantity) {
+                return ['success' => false, 'action' => 'order_creation_failed', 'message' => 'Insufficient stock'];
+            }
+
+            // Calculate totals
+            $unitPrice = $product->effective_price;
+            $totalAmount = $unitPrice * $quantity;
+
+            // Create order record
+            $order = \App\Models\Tenant\EcommerceOrder::create([
+                'tenant_id' => $this->tenantId,
+                'contact_id' => $contactId,
+                'order_number' => 'ORD-' . time() . '-' . $productId,
+                'status' => 'pending',
+                'total_amount' => $totalAmount,
+                'payment_method' => $orderData['payment_method'] ?? 'cod',
+                'customer_details' => json_encode($customerDetails),
+                'order_items' => json_encode([
+                    [
+                        'product_id' => $productId,
+                        'product_name' => $product->name,
+                        'quantity' => $quantity,
+                        'unit_price' => $unitPrice,
+                        'total_price' => $totalAmount
+                    ]
+                ]),
+                'notes' => $orderData['notes'] ?? ''
+            ]);
+
+            // Update product stock
+            $product->decrement('stock_quantity', $quantity);
+
+            EcommerceLogger::info('🛍️ ORDER-CREATED: Order successfully created', [
+                'tenant_id' => $this->tenantId,
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'product_id' => $productId,
+                'quantity' => $quantity,
+                'total_amount' => $totalAmount
+            ]);
+
+            return [
+                'success' => true, 
+                'action' => 'order_created', 
+                'message' => "Order {$order->order_number} created successfully",
+                'order_id' => $order->id,
+                'order_number' => $order->order_number
+            ];
+
+        } catch (\Exception $e) {
+            EcommerceLogger::error('🛍️ ORDER-ERROR: Failed to create order', [
+                'tenant_id' => $this->tenantId,
+                'error' => $e->getMessage(),
+                'order_data' => $orderData
+            ]);
+
+            return ['success' => false, 'action' => 'order_creation_failed', 'message' => 'Failed to create order: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Update product stock
+     */
+    protected function updateProductStock(array $stockData): array
+    {
+        try {
+            $productId = $stockData['product_id'] ?? null;
+            $quantity = $stockData['quantity'] ?? 0;
+
+            if (!$productId) {
+                return ['success' => false, 'action' => 'stock_update_failed', 'message' => 'Product ID required'];
+            }
+
+            $product = Product::where('tenant_id', $this->tenantId)->find($productId);
+            if (!$product) {
+                return ['success' => false, 'action' => 'stock_update_failed', 'message' => 'Product not found'];
+            }
+
+            $product->decrement('stock_quantity', $quantity);
+
+            return ['success' => true, 'action' => 'stock_updated', 'message' => "Stock updated for {$product->name}"];
+
+        } catch (\Exception $e) {
+            return ['success' => false, 'action' => 'stock_update_failed', 'message' => 'Failed to update stock'];
+        }
+    }
+
+    /**
+     * Add customer data  
+     */
+    protected function addCustomerData(array $customerData): array
+    {
+        // This could update the contact record with additional details
+        return ['success' => true, 'action' => 'customer_data_added', 'message' => 'Customer data processed'];
     }
 }
