@@ -395,7 +395,7 @@ class EcommerceSettings extends Component
             $this->notify(['type' => 'danger', 'message' => 'Sync failed: ' . $e->getMessage()]);
         }
     }
-
+    
     public function syncSheets()
     {
         try {
