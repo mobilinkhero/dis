@@ -5,7 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Schema\Blueprint;
-use App\Services\Loggers\EcommerceLogger;
+use Illuminate\Support\Facades\Log;
 
 class DynamicTenantTableService
 {
@@ -20,7 +20,7 @@ class DynamicTenantTableService
             // Drop if exists (fresh start)
             if (Schema::hasTable($tableName)) {
                 Schema::drop($tableName);
-                EcommerceLogger::info("Dropped existing table: {$tableName}");
+                Log::info("Dropped existing table: {$tableName}");
             }
             
             // Create new table with dynamic columns
@@ -51,14 +51,14 @@ class DynamicTenantTableService
                 }
             });
             
-            EcommerceLogger::info("Created tenant table: {$tableName}", [
+            Log::info("Created tenant table: {$tableName}", [
                 'columns' => count($headers)
             ]);
             
             return true;
             
         } catch (\Exception $e) {
-            EcommerceLogger::error("Failed to create tenant table", [
+            Log::error("Failed to create tenant table", [
                 'tenant_id' => $tenantId,
                 'error' => $e->getMessage()
             ]);
@@ -175,7 +175,7 @@ class DynamicTenantTableService
                 $inserted++;
                 
             } catch (\Exception $e) {
-                EcommerceLogger::error("Failed to insert row", [
+                Log::error("Failed to insert row", [
                     'row_index' => $rowIndex,
                     'error' => $e->getMessage()
                 ]);
@@ -231,7 +231,7 @@ class DynamicTenantTableService
             if (Schema::hasTable($tableName)) {
                 Schema::drop($tableName);
                 
-                EcommerceLogger::info("Dropped tenant table: {$tableName}");
+                Log::info("Dropped tenant table: {$tableName}");
                 
                 return true;
             }
@@ -239,7 +239,7 @@ class DynamicTenantTableService
             return false;
             
         } catch (\Exception $e) {
-            EcommerceLogger::error("Failed to drop tenant table", [
+            Log::error("Failed to drop tenant table", [
                 'tenant_id' => $tenantId,
                 'error' => $e->getMessage()
             ]);
