@@ -132,4 +132,3 @@ Route::fallback(function () {
 
 Route::get('/api/translations/{locale?}', [TranslationController::class, 'index'])
     ->name('api.translations');
-

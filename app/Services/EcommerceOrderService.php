@@ -91,9 +91,8 @@ class EcommerceOrderService
             ]);
             
             try {
-                // ULTRA-ADVANCED AI processing with next-generation capabilities
-                $aiService = new \App\Services\UltraAdvancedAiService($this->tenantId);
-                $aiResult = $aiService->processUltraAdvancedMessage($message, $contact);
+                $aiService = new AdvancedAiEcommerceService($this->tenantId);
+                $aiResult = $aiService->processAdvancedMessage($message, $contact);
                 
                 EcommerceLogger::info('🤖 AI-RESPONSE: Received AI result', [
                     'tenant_id' => $this->tenantId,
