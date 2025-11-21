@@ -401,26 +401,25 @@ class EcommerceSettings extends Component
         try {
             if (!$this->config) {
                 $this->notify(['type' => 'danger', 'message' => 'Please complete e-commerce setup first']);
+                $this->dispatch('sync-error', message: 'No configuration found');
                 return;
             }
 
-            EcommerceLogger::info('One-click sheet creation initiated', [
+            EcommerceLogger::info('Manual sync initiated from settings', [
                 'tenant_id' => tenant_id(),
                 'user_id' => auth()->id()
             ]);
+            
+            // Dispatch browser event
+            $this->dispatch('sync-started', tenantId: tenant_id());
 
-            // Try Service Account first (fully automatic)
-            $serviceAccountService = new GoogleSheetsServiceAccountService();
-            $result = $serviceAccountService->createEcommerceSheetsAutomatic($this->config);
-            
-            // If Service Account fails, fall back to import method
-            if (!$result['success']) {
-                $apiService = new GoogleSheetsDirectApiService();
-                $result = $apiService->createEcommerceSheetsOneClick($this->config);
-            }
-            
+            $sheetsService = new GoogleSheetsService();
+            $result = $sheetsService->syncProductsFromSheets();
+
             if ($result['success']) {
-                if (isset($result['method']) && $result['method'] === 'import') {
+                EcommerceLogger::info('Sync completed successfully', ['result' => $result]);
+                $this->notify(['type' => 'success', 'message' => $result['message']]);
+                $this->dispatch('sync-completed', synced: $result['synced'] ?? 0, errors: $result['errors'] ?? 0);
             } else {
                 EcommerceLogger::error('Sync failed', ['result' => $result]);
                 $this->notify(['type' => 'danger', 'message' => $result['message']]);
