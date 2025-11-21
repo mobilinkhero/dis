@@ -62,60 +62,46 @@
 
     <!-- Assistant List -->
     @if($assistant && !$showCreateForm)
-    <div class="mt-6">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-            <!-- Assistant Item -->
-            <div class="flex items-center justify-between p-4">
-                <!-- Left: Icon and Details -->
-                <div class="flex items-center space-x-4">
+    <div class="mt-6 space-y-4">
+        <!-- AI Assistant Item -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center justify-between">
+                <!-- Left: Icon and Content -->
+                <div class="flex items-center space-x-3">
                     <!-- Icon -->
                     <div class="flex-shrink-0">
-                        <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-600 rounded-lg flex items-center justify-center">
-                            <x-heroicon-s-cpu-chip class="w-7 h-7 text-white" />
-                        </div>
+                        <x-heroicon-s-cpu-chip class="w-8 h-8 text-blue-600" />
                     </div>
                     
                     <!-- Content -->
-                    <div class="flex-1 min-w-0">
+                    <div>
                         <div class="flex items-center space-x-2">
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                            <h3 class="text-base font-medium text-gray-900 dark:text-white">
                                 {{ $assistant->name }}
                             </h3>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $assistant->is_active ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100' }}">
+                            <span class="text-sm text-{{ $assistant->is_active ? 'green' : 'red' }}-600 font-medium">
                                 {{ $assistant->is_active ? 'Active' : 'Inactive' }}
                             </span>
                         </div>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            {{ $assistant->description ?: 'AI assistant designed to streamline your workflow, provide real-time insights.' }}
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            {{ $assistant->description ?: 'AI Intelligent virtual assistant designed to streamline your workflows, provide real-time insights.' }}
                         </p>
-                        
-                        <!-- Status Details -->
-                        <div class="flex items-center space-x-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
-                            <div class="flex items-center space-x-1">
-                                <div class="w-2 h-2 bg-green-400 rounded-full"></div>
-                                <span>1 document</span>
-                            </div>
-                            @if($assistant->hasUploadedFiles())
-                            <span>{{ $assistant->getFileCount() }} files uploaded</span>
-                            @endif
-                        </div>
                     </div>
                 </div>
                 
                 <!-- Right: Toggle Switch -->
-                <div class="flex items-center space-x-3">
-                    <button wire:click="editAssistant" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-                        <x-heroicon-s-pencil class="w-4 h-4" />
+                <div class="flex items-center space-x-2">
+                    <button wire:click="editAssistant" class="text-gray-400 hover:text-gray-600">
+                        Edit
                     </button>
-                    <button wire:click="deleteAssistant" wire:confirm="Are you sure you want to delete this assistant?" class="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
-                        <x-heroicon-s-trash class="w-4 h-4" />
+                    <button wire:click="deleteAssistant" wire:confirm="Delete assistant?" class="text-gray-400 hover:text-red-600">
+                        Delete
                     </button>
                     <button 
                         wire:click="toggleAssistant"
                         type="button"
-                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {{ $assistant->is_active ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600' }}"
+                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {{ $assistant->is_active ? 'bg-blue-600' : 'bg-gray-200' }}"
                     >
-                        <span class="sr-only">{{ $assistant->is_active ? 'Deactivate' : 'Activate' }} assistant</span>
                         <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {{ $assistant->is_active ? 'translate-x-6' : 'translate-x-1' }}"></span>
                     </button>
                 </div>
