@@ -237,6 +237,19 @@
                                 </div>
                             </div>
                         </a>
+
+                        <a href="{{ tenant_route('tenant.ecommerce.ai-chat-tester') }}" 
+                           class="block w-full text-left px-4 py-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors border-2 border-yellow-200 dark:border-yellow-800">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 bg-yellow-100 dark:bg-yellow-800/50 rounded-lg flex items-center justify-center">
+                                    <span class="text-lg">🤖</span>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-900 dark:text-white">Test AI Bot</p>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400">Try your bot responses live</p>
+                                </div>
+                            </div>
+                        </a>
                     </div>
                 </div>
 
