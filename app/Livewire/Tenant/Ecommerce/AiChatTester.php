@@ -47,7 +47,7 @@ class AiChatTester extends Component
         $this->testContact = Contact::firstOrCreate(
             [
                 'tenant_id' => tenant_id(),
-                'phone' => '+1234567890_test_' . $this->sessionId,
+                'phone' => '+9999' . substr($this->sessionId, 0, 6),
             ],
             [
                 'firstname' => 'Test',
