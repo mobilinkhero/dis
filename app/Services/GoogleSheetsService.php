@@ -327,89 +327,34 @@ class GoogleSheetsService
 
             $header = str_getcsv(array_shift($lines));
             
-            // 🔥 DYNAMIC COLUMN DETECTION - Auto-detect and map columns
-            $detectionResult = $this->dynamicMapper->detectAndMapColumns($header);
+            EcommerceLogger::info('📋 Creating dynamic tenant table from CSV', [
+                'tenant_id' => $this->tenantId,
+                'headers' => $header,
+                'total_columns' => count($header)
+            ]);
             
-            if (!$detectionResult['success']) {
+            // Create tenant-specific table with columns matching sheet
+            $tableCreated = $this->tableService->createTenantProductsTable($this->tenantId, $header);
+            
+            if (!$tableCreated) {
                 return [
                     'success' => false,
-                    'message' => 'Failed to detect column structure: ' . ($detectionResult['message'] ?? 'Unknown error')
+                    'message' => 'Failed to create tenant products table'
                 ];
             }
             
-            EcommerceLogger::info('🎯 DYNAMIC-SYNC: Processing sheet data with dynamic mapping', [
-                'headers' => $header,
-                'row_count' => count($lines),
-                'mapped_columns' => $detectionResult['column_mapping'],
-                'custom_fields' => $detectionResult['custom_fields']
-            ]);
-            
-            $syncedCount = 0;
-            $errorCount = 0;
-
-            foreach ($lines as $lineIndex => $line) {
+            // Parse CSV rows into array format
+            $rows = [];
+            foreach ($lines as $line) {
                 if (empty(trim($line))) continue;
-                
-                try {
-                    $row = str_getcsv($line);
-                    // Pad row to match header length
-                    $row = array_pad($row, count($header), '');
-                    
-                    EcommerceLogger::info('🔄 CSV Processing row', [
-                        'line_index' => $lineIndex,
-                        'row_data' => $row,
-                        'header' => $header
-                    ]);
-                    
-                    // Use dynamic mapper to transform row data
-                    $productData = $this->dynamicMapper->mapRowToProduct($row, $header);
-                    
-                    EcommerceLogger::info('✅ CSV Mapped product data', [
-                        'line_index' => $lineIndex,
-                        'product_data' => $productData
-                    ]);
-                    
-                    // Validate required fields
-                    if (empty($productData['name']) || empty($productData['sku'])) {
-                        throw new \Exception('Missing required fields: name or sku. Name: ' . ($productData['name'] ?? 'empty') . ', SKU: ' . ($productData['sku'] ?? 'empty'));
-                    }
-                    
-                    // Upsert product
-                    $product = Product::updateOrCreate(
-                        [
-                            'tenant_id' => $this->tenantId,
-                            'sku' => $productData['sku']
-                        ],
-                        $productData
-                    );
-                    
-                    EcommerceLogger::info('💾 CSV Product saved', [
-                        'line_index' => $lineIndex,
-                        'product_id' => $product->id,
-                        'sku' => $product->sku,
-                        'name' => $product->name
-                    ]);
-                    
-                    $syncedCount++;
-                } catch (\Exception $e) {
-                    EcommerceLogger::error('❌ CSV Product sync error', [
-                        'line_index' => $lineIndex,
-                        'line_data' => $line,
-                        'row_data' => $row ?? null,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
-                    ]);
-                    
-                    // Also log to console
-                    \Log::error("CSV Line {$lineIndex} sync failed: " . $e->getMessage(), [
-                        'line' => $line,
-                        'row' => $row ?? null,
-                        'trace' => $e->getTraceAsString()
-                    ]);
-                    
-                    $errorCount++;
-                }
+                $rows[] = str_getcsv($line);
             }
+            
+            // Insert all products into tenant table
+            $result = $this->tableService->insertProducts($this->tenantId, $header, $rows);
+            
+            $syncedCount = $result['inserted'] ?? 0;
+            $errorCount = $result['errors'] ?? 0;
 
             // Update sync status
             $this->config->update([
