@@ -129,121 +129,204 @@
         </div>
     </div>
 
-    <!-- Products Table -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            <button wire:click="sortBy('name')" class="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200">
-                                Product
-                                @if($sortBy === 'name')
-                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="{{ $sortDirection === 'asc' ? 'M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z' : 'M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' }}"/>
-                                    </svg>
-                                @endif
-                            </button>
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Price</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Stock</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
-                    @forelse($products as $product)
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td class="px-6 py-4">
-                                <div class="flex items-center">
-                                    <div class="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded-lg flex items-center justify-center mr-4">
-                                        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white">{{ $product->name }}</div>
-                                        <div class="text-sm text-gray-500 dark:text-gray-400">SKU: {{ $product->sku ?? 'N/A' }}</div>
-                                        @if($product->featured)
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-800/50 dark:text-purple-200">
-                                                ⭐ Featured
-                                            </span>
-                                        @endif
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900 dark:text-white">
-                                    ${{ number_format($product->effective_price, 2) }}
-                                    @if($product->is_on_sale)
-                                        <span class="text-xs text-gray-500 line-through ml-1">${{ number_format($product->price, 2) }}</span>
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800/50 dark:text-red-200 ml-1">
-                                            Sale
-                                        </span>
-                                    @endif
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900 dark:text-white">{{ $product->stock_quantity }}</div>
-                                @if($product->is_low_stock)
-                                    <div class="text-xs text-orange-600 dark:text-orange-400">Low Stock</div>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900 dark:text-white">{{ $product->category ?: 'Uncategorized' }}</div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                                    {{ $product->status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-800/50 dark:text-green-200' : '' }}
-                                    {{ $product->status === 'inactive' ? 'bg-red-100 text-red-800 dark:bg-red-800/50 dark:text-red-200' : '' }}
-                                    {{ $product->status === 'draft' ? 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-200' : '' }}">
-                                    {{ ucfirst($product->status) }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <div class="flex items-center gap-2">
-                                    <button wire:click="editProduct({{ $product->id }})" 
-                                            class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
-                                        Edit
-                                    </button>
-                                    <button wire:click="toggleFeatured({{ $product->id }})" 
-                                            class="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300">
-                                        {{ $product->featured ? 'Unfeature' : 'Feature' }}
-                                    </button>
-                                    <button wire:click="deleteProduct({{ $product->id }})" 
-                                            onclick="return confirm('Are you sure?')"
-                                            class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                                        Delete
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="px-6 py-12 text-center">
-                                <div class="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                    </svg>
-                                </div>
-                                <p class="text-gray-500 dark:text-gray-400 mb-4">No products found</p>
-                                <button wire:click="createProduct" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                    Add Your First Product
-                                </button>
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+    <!-- Products Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        @forelse($products as $product)
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+                <!-- Product Image -->
+                <div class="relative h-64 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 overflow-hidden">
+                    @if(isset($product->image_url) && !empty($product->image_url))
+                        <img src="{{ $product->image_url }}" 
+                             alt="{{ $product->title ?? 'Product' }}"
+                             class="w-full h-full object-cover"
+                             onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23f3f4f6%22 width=%22200%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2220%22%3ENo Image%3C/text%3E%3C/svg%3E'">
+                    @else
+                        <div class="w-full h-full flex items-center justify-center">
+                            <svg class="w-20 h-20 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                        </div>
+                    @endif
+                    
+                    <!-- Status Badge -->
+                    @if(isset($product->status))
+                        <div class="absolute top-3 right-3">
+                            <span class="px-3 py-1 rounded-full text-xs font-bold shadow-lg
+                                {{ $product->status === 'Active' ? 'bg-green-500 text-white' : '' }}
+                                {{ $product->status === 'Inactive' ? 'bg-red-500 text-white' : '' }}
+                                {{ $product->status === 'Draft' ? 'bg-gray-500 text-white' : '' }}">
+                                {{ $product->status }}
+                            </span>
+                        </div>
+                    @endif
+                    
+                    <!-- Creative Grade -->
+                    @if(isset($product->creative_grade) && !empty($product->creative_grade))
+                        <div class="absolute top-3 left-3">
+                            <span class="px-2 py-1 bg-purple-500 text-white rounded-full text-xs font-bold shadow-lg">
+                                Grade {{ $product->creative_grade }}
+                            </span>
+                        </div>
+                    @endif
+                </div>
 
-        @if($products->hasPages())
-            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-600">
-                {{ $products->links() }}
+                <!-- Product Details -->
+                <div class="p-5">
+                    <!-- Product ID -->
+                    @if(isset($product->product_id))
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            ID: {{ $product->product_id }}
+                        </div>
+                    @endif
+                    
+                    <!-- Product Title -->
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2 line-clamp-2 min-h-[3.5rem]">
+                        {{ $product->title ?? 'Untitled Product' }}
+                    </h3>
+                    
+                    <!-- Product Type -->
+                    @if(isset($product->product_type) && !empty($product->product_type))
+                        <div class="mb-3">
+                            <span class="inline-block px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded-md text-xs font-medium">
+                                {{ $product->product_type }}
+                            </span>
+                        </div>
+                    @endif
+                    
+                    <!-- Colors & Sizes -->
+                    <div class="flex items-center gap-3 mb-3 text-sm">
+                        @if(isset($product->colors) && !empty($product->colors))
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-600 dark:text-gray-400">🎨</span>
+                                <span class="text-gray-700 dark:text-gray-300">{{ $product->colors }}</span>
+                            </div>
+                        @endif
+                        
+                        @if(isset($product->sizes) && !empty($product->sizes))
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-600 dark:text-gray-400">📏</span>
+                                <span class="text-gray-700 dark:text-gray-300">{{ $product->sizes }}</span>
+                            </div>
+                        @endif
+                    </div>
+                    
+                    <!-- Price -->
+                    <div class="mb-3">
+                        @if(isset($product->selling_price) && !empty($product->selling_price))
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl font-bold text-gray-900 dark:text-white">
+                                    ${{ number_format($product->selling_price, 2) }}
+                                </span>
+                                
+                                @if(isset($product->purchase_price_) && !empty($product->purchase_price_) && $product->purchase_price_ > 0)
+                                    <span class="text-sm text-gray-500 line-through">
+                                        ${{ number_format($product->purchase_price_, 2) }}
+                                    </span>
+                                @endif
+                                
+                                @if(isset($product->price_cut_shown) && $product->price_cut_shown === 'TRUE')
+                                    <span class="px-2 py-0.5 bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 rounded text-xs font-bold">
+                                        SALE
+                                    </span>
+                                @endif
+                            </div>
+                        @endif
+                        
+                        @if(isset($product->advance_amount) && $product->advance_amount > 0)
+                            <div class="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                                💰 Advance: ${{ number_format($product->advance_amount, 2) }}
+                            </div>
+                        @endif
+                    </div>
+                    
+                    <!-- Stock Info -->
+                    <div class="mb-3">
+                        @if(isset($product->quantity_type))
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-medium 
+                                    {{ $product->quantity_type === 'In Stock' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
+                                    {{ $product->quantity_type }}
+                                </span>
+                                @if(isset($product->quantity_int))
+                                    <span class="text-sm text-gray-600 dark:text-gray-400">
+                                        ({{ $product->quantity_int }} units)
+                                    </span>
+                                @endif
+                            </div>
+                        @elseif(isset($product->quantity))
+                            <div class="text-sm text-gray-600 dark:text-gray-400">
+                                Stock: {{ $product->quantity }} units
+                            </div>
+                        @endif
+                    </div>
+                    
+                    <!-- Tags -->
+                    @if(isset($product->tags) && !empty($product->tags))
+                        <div class="flex flex-wrap gap-1 mb-3">
+                            @php
+                                $tags = is_string($product->tags) ? explode(',', $product->tags) : [];
+                            @endphp
+                            @foreach(array_slice($tags, 0, 3) as $tag)
+                                <span class="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-xs">
+                                    #{{ trim($tag) }}
+                                </span>
+                            @endforeach
+                        </div>
+                    @endif
+                    
+                    <!-- Slider Group -->
+                    @if(isset($product->slider_group) && !empty($product->slider_group))
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                            📁 {{ $product->slider_group }}
+                        </div>
+                    @endif
+                    
+                    <!-- Actions -->
+                    <div class="flex gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        @if(isset($product->video_url) && $product->video_url !== '[URL]' && !empty($product->video_url))
+                            <a href="{{ $product->video_url }}" target="_blank" 
+                               class="flex-1 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-center text-sm font-medium">
+                                ▶️ Video
+                            </a>
+                        @endif
+                        
+                        <button class="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">
+                            View Details
+                        </button>
+                    </div>
+                    
+                    <!-- Expiry Warning -->
+                    @if(isset($product->expiry_at_urgent) && !empty($product->expiry_at_urgent))
+                        <div class="mt-3 px-2 py-1 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-xs text-red-800 dark:text-red-200">
+                            ⏰ Expires: {{ $product->expiry_at_urgent }}
+                        </div>
+                    @endif
+                </div>
             </div>
-        @endif
+        @empty
+            <div class="col-span-full">
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-12 text-center border-2 border-dashed border-gray-300 dark:border-gray-600">
+                    <div class="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No products found</h3>
+                    <p class="text-gray-500 dark:text-gray-400 mb-4">Sync your Google Sheets to import products</p>
+                    <button wire:click="syncProducts" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+                        🔄 Sync Products Now
+                    </button>
+                </div>
+            </div>
+        @endforelse
     </div>
+
+    <!-- Pagination -->
+    @if($products->hasPages())
+        <div class="mt-6">
+            {{ $products->links() }}
+        </div>
+    @endif
 
     <!-- Product Modal -->
     @if($showProductModal)
