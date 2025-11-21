@@ -470,6 +470,81 @@ class EcommerceSettings extends Component
         $this->serviceAccountStatus = $service->checkServiceAccountSetup();
     }
 
+    public function disconnectGoogleSheets()
+    {
+        try {
+            if (!$this->config) {
+                $this->notify(['type' => 'danger', 'message' => 'No e-commerce configuration found']);
+                return;
+            }
+
+            $tenantId = tenant_id();
+            $previousProductCount = \App\Models\Tenant\Product::where('tenant_id', $tenantId)->count();
+
+            EcommerceLogger::info('Google Sheets disconnection initiated', [
+                'tenant_id' => $tenantId,
+                'user_id' => auth()->id(),
+                'previous_url' => $this->config->google_sheets_url,
+                'existing_products' => $previousProductCount
+            ]);
+
+            // Clear Google Sheets configuration
+            $this->config->update([
+                'google_sheets_url' => null,
+                'google_sheets_enabled' => false,
+                'products_sheet_id' => null,
+                'orders_sheet_id' => null,
+                'customers_sheet_id' => null,
+                'last_sync_at' => null,
+            ]);
+
+            // Clear dynamic mapper configuration
+            \App\Models\Tenant\TenantSheetConfiguration::where('tenant_id', $tenantId)
+                ->where('sheet_type', 'products')
+                ->delete();
+
+            EcommerceLogger::info('Dynamic mapper configuration cleared', [
+                'tenant_id' => $tenantId
+            ]);
+
+            // Update local settings
+            $this->settings['google_sheets_url'] = '';
+            $this->settings['google_sheets_enabled'] = false;
+
+            EcommerceLogger::info('Google Sheets disconnected successfully', [
+                'tenant_id' => $tenantId,
+                'user_id' => auth()->id(),
+                'products_retained' => $previousProductCount
+            ]);
+
+            $this->notify([
+                'type' => 'success', 
+                'message' => "Google Sheets disconnected successfully! ({$previousProductCount} products retained. Use 'Clear Products' on Dashboard to remove them.)"
+            ]);
+
+            // Refresh the component
+            $this->loadSettings();
+
+        } catch (\Exception $e) {
+            EcommerceLogger::error('Google Sheets disconnection failed', [
+                'tenant_id' => tenant_id(),
+                'user_id' => auth()->id(),
+                'exception' => $e->getMessage(),
+                'stack_trace' => $e->getTraceAsString()
+            ]);
+
+            $this->notify([
+                'type' => 'danger', 
+                'message' => 'Failed to disconnect Google Sheets: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    protected function getDefaultOrderMessage()
+    {
+        return "🎉 *Order Confirmed!*\n\nThank you for your order #{order_number}!\n\n*Order Details:*\n{order_items}\n\n*Total Amount:* {total_amount}\n*Payment Method:* {payment_method}\n\nWe'll process your order and keep you updated!";
+    }
+
     protected function getDefaultPaymentMessage()
     {
         return "✅ Payment Received! Thank you for your payment of {payment_amount} for order #{order_number}. Your order will be shipped soon!";
