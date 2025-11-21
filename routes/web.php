@@ -133,15 +133,17 @@ Route::fallback(function () {
 Route::get('/api/translations/{locale?}', [TranslationController::class, 'index'])
     ->name('api.translations');
 
-// AI E-Commerce Visual Interfaces
-Route::get('/ai-dashboard', function () {
-    return view('dashboard.ai-analytics');
-})->name('ai.dashboard');
+// AI E-Commerce Visual Interfaces - Updated for tenant pattern
+Route::middleware(['auth'])->group(function () {
+    Route::get('/{subdomain}/ai-dashboard', function () {
+        return view('dashboard.ai-analytics');
+    })->name('tenant.ai.dashboard');
 
-Route::get('/visual-search', function () {
-    return view('customer.visual-search');
-})->name('visual.search');
+    Route::get('/{subdomain}/visual-search', function () {
+        return view('customer.visual-search');
+    })->name('tenant.visual.search');
 
-Route::get('/ar-tryout', function () {
-    return view('customer.ar-tryout');
-})->name('ar.tryout');
+    Route::get('/{subdomain}/ar-tryout', function () {
+        return view('customer.ar-tryout');
+    })->name('tenant.ar.tryout');
+});
