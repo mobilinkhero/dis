@@ -421,34 +421,22 @@ class EcommerceSettings extends Component
             
             if ($result['success']) {
                 if (isset($result['method']) && $result['method'] === 'import') {
-                    // Show import modal with prepared data
-                    $this->importData = $result['import_data'];
-                    $this->showImportModal = true;
-                    $this->notify(['type' => 'info', 'message' => 'Sheet structure prepared! Please follow the import instructions.']);
-                } else {
-                    // Sheets were created successfully via API
-                    $this->notify(['type' => 'success', 'message' => $result['message']]);
-                }
-                
-                EcommerceLogger::info('One-click sheet creation completed', [
-                    'tenant_id' => tenant_id(),
-                    'method' => $result['method'] ?? 'api',
-                    'created_sheets' => $result['created_sheets'] ?? []
-                ]);
             } else {
-                EcommerceLogger::error('One-click sheet creation failed', [
-                    'tenant_id' => tenant_id(),
-                    'error' => $result['message']
-                ]);
+                EcommerceLogger::error('Sync failed', ['result' => $result]);
                 $this->notify(['type' => 'danger', 'message' => $result['message']]);
+                $this->dispatch('sync-error', message: $result['message']);
             }
+
         } catch (\Exception $e) {
-            EcommerceLogger::error('One-click sheet creation exception', [
+            EcommerceLogger::error('Sync exception', [
                 'tenant_id' => tenant_id(),
                 'exception' => $e->getMessage(),
-                'stack_trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString()
             ]);
-            $this->notify(['type' => 'danger', 'message' => 'Sheet creation failed: ' . $e->getMessage()]);
+
+            $errorMsg = 'Sync failed: ' . $e->getMessage();
+            $this->notify(['type' => 'danger', 'message' => $errorMsg]);
+            $this->dispatch('sync-error', message: $errorMsg);
         }
     }
 

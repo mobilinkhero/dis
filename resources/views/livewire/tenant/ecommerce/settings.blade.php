@@ -623,6 +623,8 @@
         </div>
     @endif
 
+    @include('livewire.tenant.ecommerce.sync-debug-console')
+
     <!-- Import Modal -->
     @if($showImportModal)
         <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
