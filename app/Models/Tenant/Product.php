@@ -46,11 +46,11 @@ class Product extends BaseModel
         'stock_quantity' => 'int',
         'low_stock_threshold' => 'int',
         'weight' => 'decimal:2',
-        'featured' => 'bool',
-        'tags' => 'json',
-        'images' => 'json',
-        'dimensions' => 'json',
-        'meta_data' => 'json',
+        'tags' => 'array',
+        'images' => 'array',
+        'dimensions' => 'array',
+        'meta_data' => 'array', // Used for dynamic custom fields from Google Sheets
+        'featured' => 'boolean',
         'last_synced_at' => 'datetime',
     ];
 
@@ -170,5 +170,49 @@ class Product extends BaseModel
             ->inStock()
             ->limit($limit)
             ->get();
+    }
+
+    /**
+     * Get a custom field value from meta_data
+     */
+    public function getCustomField(string $fieldName, $default = null)
+    {
+        $metaData = $this->meta_data ?? [];
+        return $metaData[$fieldName] ?? $default;
+    }
+
+    /**
+     * Set a custom field value in meta_data
+     */
+    public function setCustomField(string $fieldName, $value): void
+    {
+        $metaData = $this->meta_data ?? [];
+        $metaData[$fieldName] = $value;
+        $this->meta_data = $metaData;
+    }
+
+    /**
+     * Get all custom fields
+     */
+    public function getCustomFieldsAttribute(): array
+    {
+        $metaData = $this->meta_data ?? [];
+        $customFields = [];
+        
+        foreach ($metaData as $key => $value) {
+            if (str_starts_with($key, 'custom_')) {
+                $customFields[$key] = $value;
+            }
+        }
+        
+        return $customFields;
+    }
+
+    /**
+     * Check if product has custom fields
+     */
+    public function hasCustomFields(): bool
+    {
+        return !empty($this->custom_fields);
     }
 }

@@ -6,6 +6,7 @@ use App\Models\Tenant\EcommerceConfiguration;
 use App\Models\Tenant\Product;
 use App\Models\Tenant\Order;
 use App\Services\EcommerceLogger;
+use App\Services\DynamicSheetMapperService;
 use App\Services\GoogleSheetsServiceAccountService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -19,11 +20,13 @@ class GoogleSheetsService
 {
     protected $tenantId;
     protected $config;
+    protected $dynamicMapper;
 
-    public function __construct($tenantId = null)
+    public function __construct(?int $tenantId = null)
     {
-        $this->tenantId = $tenantId ?? tenant_id();
+        $this->tenantId = $tenantId ?? tenancy()->tenant?->id;
         $this->config = EcommerceConfiguration::where('tenant_id', $this->tenantId)->first();
+        $this->dynamicMapper = new DynamicSheetMapperService($this->tenantId, 'products');
     }
 
     /**
@@ -324,9 +327,21 @@ class GoogleSheetsService
 
             $header = str_getcsv(array_shift($lines));
             
-            EcommerceLogger::info('Processing sheet data', [
+            // 🔥 DYNAMIC COLUMN DETECTION - Auto-detect and map columns
+            $detectionResult = $this->dynamicMapper->detectAndMapColumns($header);
+            
+            if (!$detectionResult['success']) {
+                return [
+                    'success' => false,
+                    'message' => 'Failed to detect column structure: ' . ($detectionResult['message'] ?? 'Unknown error')
+                ];
+            }
+            
+            EcommerceLogger::info('🎯 DYNAMIC-SYNC: Processing sheet data with dynamic mapping', [
                 'headers' => $header,
-                'row_count' => count($lines)
+                'row_count' => count($lines),
+                'mapped_columns' => $detectionResult['column_mapping'],
+                'custom_fields' => $detectionResult['custom_fields']
             ]);
             
             $syncedCount = 0;
@@ -336,8 +351,22 @@ class GoogleSheetsService
                 if (empty(trim($line))) continue;
                 
                 try {
-                    $data = array_combine($header, str_getcsv($line));
-                    $this->syncProduct($data);
+                    $row = str_getcsv($line);
+                    // Pad row to match header length
+                    $row = array_pad($row, count($header), '');
+                    
+                    // Use dynamic mapper to transform row data
+                    $productData = $this->dynamicMapper->mapRowToProduct($row, $header);
+                    
+                    // Upsert product
+                    Product::updateOrCreate(
+                        [
+                            'tenant_id' => $this->tenantId,
+                            'sku' => $productData['sku']
+                        ],
+                        $productData
+                    );
+                    
                     $syncedCount++;
                 } catch (\Exception $e) {
                     EcommerceLogger::error('Product sync error', [
@@ -443,9 +472,21 @@ class GoogleSheetsService
             $rows = $data['values'];
             $header = array_shift($rows);
             
-            EcommerceLogger::info('Processing sheet data with Service Account', [
+            // 🔥 DYNAMIC COLUMN DETECTION - Auto-detect and map columns
+            $detectionResult = $this->dynamicMapper->detectAndMapColumns($header);
+            
+            if (!$detectionResult['success']) {
+                return [
+                    'success' => false,
+                    'message' => 'Failed to detect column structure: ' . ($detectionResult['message'] ?? 'Unknown error')
+                ];
+            }
+            
+            EcommerceLogger::info('🎯 DYNAMIC-SYNC: Processing sheet data with Service Account and dynamic mapping', [
                 'headers' => $header,
-                'row_count' => count($rows)
+                'row_count' => count($rows),
+                'mapped_columns' => $detectionResult['column_mapping'],
+                'custom_fields' => $detectionResult['custom_fields']
             ]);
             
             $syncedCount = 0;
@@ -457,8 +498,19 @@ class GoogleSheetsService
                 try {
                     // Pad row to match header length
                     $row = array_pad($row, count($header), '');
-                    $productData = array_combine($header, $row);
-                    $this->syncProduct($productData);
+                    
+                    // Use dynamic mapper to transform row data
+                    $productData = $this->dynamicMapper->mapRowToProduct($row, $header);
+                    
+                    // Upsert product
+                    Product::updateOrCreate(
+                        [
+                            'tenant_id' => $this->tenantId,
+                            'sku' => $productData['sku']
+                        ],
+                        $productData
+                    );
+                    
                     $syncedCount++;
                 } catch (\Exception $e) {
                     EcommerceLogger::error('Product sync error', [
@@ -502,39 +554,27 @@ class GoogleSheetsService
     }
 
     /**
-     * Sync individual product
+     * Get dynamic mapper configuration summary
      */
-    protected function syncProduct(array $data): void
+    public function getDynamicMapperSummary(): array
     {
-        $productData = [
-            'tenant_id' => $this->tenantId,
-            'google_sheet_row_id' => $data['ID'] ?? null,
-            'sku' => $data['SKU'] ?? null,
-            'name' => $data['Name'] ?? '',
-            'description' => $data['Description'] ?? '',
-            'price' => (float) ($data['Price'] ?? 0),
-            'sale_price' => !empty($data['Sale Price']) ? (float) $data['Sale Price'] : null,
-            'stock_quantity' => (int) ($data['Stock Quantity'] ?? 0),
-            'category' => $data['Category'] ?? '',
-            'subcategory' => $data['Subcategory'] ?? '',
-            'tags' => !empty($data['Tags']) ? explode(',', $data['Tags']) : [],
-            'images' => !empty($data['Images (URLs)']) ? explode(',', $data['Images (URLs)']) : [],
-            'weight' => !empty($data['Weight']) ? (float) $data['Weight'] : null,
-            'status' => strtolower($data['Status'] ?? 'active'),
-            'featured' => strtolower($data['Featured'] ?? 'no') === 'yes',
-            'low_stock_threshold' => (int) ($data['Low Stock Threshold'] ?? 5),
-            'sync_status' => 'synced',
-            'last_synced_at' => Carbon::now(),
-        ];
+        return $this->dynamicMapper->getConfigurationSummary();
+    }
 
-        // Update or create product
-        Product::updateOrCreate(
-            [
-                'tenant_id' => $this->tenantId,
-                'sku' => $productData['sku']
-            ],
-            $productData
-        );
+    /**
+     * Reset dynamic column detection (force re-detection)
+     */
+    public function resetColumnDetection(): bool
+    {
+        return $this->dynamicMapper->resetConfiguration();
+    }
+
+    /**
+     * Manually update column mapping
+     */
+    public function updateColumnMapping(array $mapping): bool
+    {
+        return $this->dynamicMapper->updateMapping($mapping);
     }
 
     /**
