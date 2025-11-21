@@ -23,8 +23,8 @@ return new class extends Migration
             $table->timestamps();
 
             // Indexes for analytics
-            $table->index(['tenant_id', 'contact_id', 'created_at']);
-            $table->index(['tenant_id', 'interaction_type', 'created_at']);
+            $table->index(['tenant_id', 'contact_id', 'created_at'], 'ci_tenant_contact_date_idx');
+            $table->index(['tenant_id', 'interaction_type', 'created_at'], 'ci_tenant_type_date_idx');
         });
     }
 
