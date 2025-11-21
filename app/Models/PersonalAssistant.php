@@ -55,6 +55,11 @@ class PersonalAssistant extends Model
         'use_case_tags' => 'array',
     ];
 
+    protected $attributes = [
+        'is_active' => true,
+        'file_analysis_enabled' => true,
+    ];
+
     /**
      * Available AI models
      */

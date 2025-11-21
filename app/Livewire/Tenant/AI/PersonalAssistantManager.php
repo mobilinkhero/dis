@@ -242,6 +242,28 @@ class PersonalAssistantManager extends Component
         session()->flash('success', 'File status refreshed');
     }
 
+    public function toggleAssistant()
+    {
+        if (!$this->assistant) {
+            return;
+        }
+
+        try {
+            $this->assistant->update([
+                'is_active' => !$this->assistant->is_active
+            ]);
+            
+            $status = $this->assistant->is_active ? 'activated' : 'deactivated';
+            session()->flash('success', "Assistant {$status} successfully!");
+            
+            // Refresh the assistant data
+            $this->loadAssistant();
+            
+        } catch (\Exception $e) {
+            session()->flash('error', 'Failed to toggle assistant: ' . $e->getMessage());
+        }
+    }
+
     public function updatedUseCaseTags()
     {
         // Auto-update system instructions based on selected use cases

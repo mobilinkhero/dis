@@ -5,18 +5,23 @@
         <div>
             <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">AI Assistant</h1>
             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Create your personal AI assistant to help with FAQs, product enquiries, onboarding, and more.
+                Manage your personal AI assistant to help with FAQs, product enquiries, onboarding, and more.
             </p>
         </div>
         
-        @if(!$assistant)
         <div class="mt-4 sm:mt-0">
-            <button wire:click="createAssistant" type="button" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+            @if(!$assistant)
+            <button wire:click="createAssistant" type="button" class="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
                 <x-heroicon-m-plus class="-ml-1 mr-2 h-5 w-5" />
                 Create New Assistant
             </button>
+            @else
+            <button wire:click="createAssistant" type="button" class="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                <x-heroicon-m-plus class="-ml-1 mr-2 h-5 w-5" />
+                Create New Assistant
+            </button>
+            @endif
         </div>
-        @endif
     </div>
 
     <!-- Flash Messages -->
@@ -55,121 +60,180 @@
     </div>
     @endif
 
-    <!-- Assistant Details -->
+    <!-- Assistant Card -->
     @if($assistant && !$showCreateForm)
-    <div class="mt-6 bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg">
-        <div class="px-4 py-5 sm:px-6 flex justify-between items-start">
-            <div>
-                <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-                    {{ $assistant->name }}
-                </h3>
-                <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-                    {{ $assistant->description ?: 'No description provided' }}
-                </p>
-                
-                <!-- Use Case Tags -->
-                @if($assistant->use_case_tags)
-                <div class="mt-3 flex flex-wrap gap-2">
-                    @foreach($assistant->getUseCaseBadges() as $badge)
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200">
-                        {{ $badge }}
-                    </span>
-                    @endforeach
+    <div class="mt-6">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <!-- Card Header -->
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                                <x-heroicon-s-cpu-chip class="w-6 h-6 text-white" />
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                                {{ $assistant->name }}
+                            </h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                {{ $assistant->description ?: 'AI Assistant for your business needs' }}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Toggle Switch -->
+                    <div class="flex items-center space-x-3">
+                        <div class="flex items-center">
+                            <button 
+                                wire:click="toggleAssistant"
+                                type="button"
+                                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {{ $assistant->is_active ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600' }}"
+                            >
+                                <span class="sr-only">{{ $assistant->is_active ? 'Deactivate' : 'Activate' }} assistant</span>
+                                <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {{ $assistant->is_active ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                            </button>
+                        </div>
+                        <span class="text-sm font-medium {{ $assistant->is_active ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400' }}">
+                            {{ $assistant->is_active ? 'Active' : 'Inactive' }}
+                        </span>
+                    </div>
                 </div>
-                @endif
+            </div>
+
+            <!-- Status Bar -->
+            <div class="px-6 py-3 bg-gray-50 dark:bg-gray-750">
+                <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-1">
+                            <div class="w-2 h-2 rounded-full {{ $assistant->is_active ? 'bg-green-400' : 'bg-gray-400' }}"></div>
+                            <span class="text-gray-600 dark:text-gray-300">
+                                {{ $assistant->is_active ? 'Online' : 'Offline' }}
+                            </span>
+                        </div>
+                        
+                        @if($assistant->hasUploadedFiles())
+                        <div class="flex items-center space-x-1">
+                            <x-heroicon-s-document-text class="w-4 h-4 text-blue-500" />
+                            <span class="text-gray-600 dark:text-gray-300">
+                                {{ $assistant->getFileCount() }} files processed
+                            </span>
+                        </div>
+                        @endif
+                        
+                        <div class="flex items-center space-x-1">
+                            <x-heroicon-s-cog-6-tooth class="w-4 h-4 text-gray-500" />
+                            <span class="text-gray-600 dark:text-gray-300">
+                                {{ $availableModels[$assistant->model] ?? $assistant->model }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <button wire:click="editAssistant" type="button" class="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                            <x-heroicon-s-pencil class="w-4 h-4" />
+                        </button>
+                        <button wire:click="deleteAssistant" wire:confirm="Are you sure you want to delete this assistant and all its files?" type="button" class="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                            <x-heroicon-s-trash class="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
             </div>
             
-            <div class="flex space-x-2">
-                <button wire:click="editAssistant" type="button" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600">
-                    <x-heroicon-m-pencil class="-ml-1 mr-1 h-4 w-4" />
-                    Edit
-                </button>
-                <button wire:click="deleteAssistant" wire:confirm="Are you sure you want to delete this assistant and all its files?" type="button" class="inline-flex items-center px-3 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 dark:bg-gray-700 dark:text-red-400 dark:border-red-600 dark:hover:bg-red-900">
-                    <x-heroicon-m-trash class="-ml-1 mr-1 h-4 w-4" />
-                    Delete
-                </button>
-            </div>
-        </div>
-        
-        <div class="border-t border-gray-200 dark:border-gray-700">
-            <dl>
-                <!-- Model & Settings -->
-                <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">AI Model</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-                        {{ $availableModels[$assistant->model] ?? $assistant->model }}
-                        <span class="ml-2 text-xs text-gray-500">
-                            (Temperature: {{ $assistant->temperature }}, Max tokens: {{ number_format($assistant->max_tokens) }})
+            <!-- Content Sections -->
+            <div class="p-6 space-y-6">
+                <!-- Use Case Tags -->
+                @if($assistant->use_case_tags && count($assistant->use_case_tags) > 0)
+                <div>
+                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Use Cases</h4>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach($assistant->getUseCaseBadges() as $badge)
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            {{ $badge }}
                         </span>
-                    </dd>
+                        @endforeach
+                    </div>
                 </div>
+                @endif
 
-                <!-- System Instructions -->
-                <div class="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">System Instructions</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-                        <div class="max-h-32 overflow-y-auto">
-                            <pre class="whitespace-pre-wrap text-xs bg-gray-50 dark:bg-gray-700 p-3 rounded">{{ $assistant->system_instructions }}</pre>
+                <!-- AI Configuration -->
+                <div>
+                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Configuration</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Model</div>
+                            <div class="text-sm font-medium text-gray-900 dark:text-white">{{ $availableModels[$assistant->model] ?? $assistant->model }}</div>
                         </div>
-                    </dd>
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Temperature</div>
+                            <div class="text-sm font-medium text-gray-900 dark:text-white">{{ $assistant->temperature }}</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Max Tokens</div>
+                            <div class="text-sm font-medium text-gray-900 dark:text-white">{{ number_format($assistant->max_tokens) }}</div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Uploaded Files -->
-                <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Knowledge Base</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-                        @if($assistant->hasUploadedFiles())
+                <!-- Knowledge Base -->
+                @if($assistant->hasUploadedFiles())
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Knowledge Base</h4>
+                        <button wire:click="clearAllFiles" wire:confirm="Clear all uploaded files?" class="text-xs text-red-600 hover:text-red-800 font-medium">
+                            Clear all files
+                        </button>
+                    </div>
+                    
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                            {{ $assistant->getFileCount() }} files • {{ number_format($assistant->getContentSize()) }} characters processed
+                        </div>
+                        
                         <div class="space-y-2">
-                            <div class="flex justify-between items-center">
-                                <span class="text-sm text-gray-600 dark:text-gray-400">
-                                    {{ $assistant->getFileCount() }} files, {{ number_format($assistant->getContentSize()) }} characters processed
-                                </span>
-                                <button wire:click="clearAllFiles" wire:confirm="Clear all uploaded files?" class="text-red-600 hover:text-red-800 text-xs">
-                                    Clear all files
-                                </button>
-                            </div>
-                            
                             @foreach($assistant->getFilesWithStatus() as $file)
-                            <div class="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border">
+                            <div class="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded-md">
                                 <div class="flex items-center space-x-3">
                                     <div class="flex-shrink-0">
                                         @if($file['type'] === 'csv')
-                                        <x-heroicon-o-table-cells class="h-5 w-5 text-green-500" />
+                                        <x-heroicon-s-table-cells class="h-4 w-4 text-green-500" />
                                         @elseif(in_array($file['type'], ['txt', 'md']))
-                                        <x-heroicon-o-document-text class="h-5 w-5 text-blue-500" />
+                                        <x-heroicon-s-document-text class="h-4 w-4 text-blue-500" />
                                         @elseif($file['type'] === 'json')
-                                        <x-heroicon-o-code-bracket class="h-5 w-5 text-purple-500" />
+                                        <x-heroicon-s-code-bracket class="h-4 w-4 text-purple-500" />
                                         @else
-                                        <x-heroicon-o-document class="h-5 w-5 text-gray-500" />
+                                        <x-heroicon-s-document class="h-4 w-4 text-gray-500" />
                                         @endif
                                     </div>
-                                    <div>
-                                        <p class="text-sm font-medium text-gray-900 dark:text-white">{{ $file['original_name'] }}</p>
-                                        <p class="text-xs text-gray-500">
-                                            @if(isset($file['size']) && $file['size'] > 0)
-                                                {{ number_format($file['size']) }} bytes
-                                            @else
-                                                0 bytes
-                                            @endif
-                                            • {{ strtoupper($file['type']) }}
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ $file['original_name'] }}</p>
+                                        <div class="flex items-center space-x-2 text-xs text-gray-500">
+                                            <span>
+                                                @if(isset($file['size']) && $file['size'] > 0)
+                                                    {{ number_format($file['size']) }} bytes
+                                                @else
+                                                    0 bytes
+                                                @endif
+                                            </span>
+                                            <span>•</span>
+                                            <span>{{ strtoupper($file['type']) }}</span>
                                             @if(isset($file['exists']) && !$file['exists'])
-                                            <span class="text-red-500">• File missing</span>
+                                            <span class="text-red-500">• Missing</span>
                                             @endif
-                                        </p>
+                                        </div>
                                     </div>
                                 </div>
-                                <button wire:click="removeFile('{{ $file['original_name'] }}')" class="text-red-600 hover:text-red-800">
-                                    <x-heroicon-m-trash class="h-4 w-4" />
+                                <button wire:click="removeFile('{{ $file['original_name'] }}')" class="p-1 text-gray-400 hover:text-red-600 transition-colors">
+                                    <x-heroicon-s-trash class="h-4 w-4" />
                                 </button>
                             </div>
                             @endforeach
                         </div>
-                        @else
-                        <p class="text-gray-500 italic">No files uploaded yet</p>
-                        @endif
-                    </dd>
+                    </div>
                 </div>
-            </dl>
+                @endif
+            </div>
         </div>
     </div>
     @endif
