@@ -281,18 +281,9 @@ Route::middleware(['auth', TenantMiddleware::class, CheckTenantDeleted::class, E
                 Route::get('/products', \App\Livewire\Tenant\Ecommerce\ProductManager::class)->name('products');
                 Route::get('/orders', \App\Livewire\Tenant\Ecommerce\OrderManager::class)->name('orders');
                 Route::get('/analytics', \App\Livewire\Tenant\Ecommerce\EcommerceAnalytics::class)->name('analytics');
-                
-                // AI Features
-                Route::get('/ai-dashboard', function () {
-                    return view('dashboard.ai-analytics');
-                })->name('ai-dashboard');
-                Route::get('/visual-search', function () {
-                    return view('customer.visual-search');
-                })->name('visual-search');
-                Route::get('/ar-tryout', function () {
-                    return view('customer.ar-tryout');
-                })->name('ar-tryout');
-                
+                Route::get('/ai-dashboard', function () { return view('dashboard.ai-analytics'); })->name('ai-dashboard');
+                Route::get('/visual-search', function () { return view('customer.visual-search'); })->name('visual-search');  
+                Route::get('/ar-tryout', function () { return view('customer.ar-tryout'); })->name('ar-tryout');
                 Route::get('/settings', \App\Livewire\Tenant\Ecommerce\EcommerceSettings::class)->name('settings');
             });
             Route::get('/custom-fields/{customFieldId}/edit', CustomFieldCreator::class)->name('custom-fields.edit');
