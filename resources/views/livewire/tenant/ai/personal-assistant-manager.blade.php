@@ -129,7 +129,7 @@
                                 </button>
                             </div>
                             
-                            @foreach($assistant->uploaded_files as $file)
+                            @foreach($assistant->getFilesWithStatus() as $file)
                             <div class="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border">
                                 <div class="flex items-center space-x-3">
                                     <div class="flex-shrink-0">
@@ -146,8 +146,13 @@
                                     <div>
                                         <p class="text-sm font-medium text-gray-900 dark:text-white">{{ $file['original_name'] }}</p>
                                         <p class="text-xs text-gray-500">
-                                            {{ number_format($file['size']) }} bytes • {{ strtoupper($file['type']) }}
-                                            @if(!$file['exists'])
+                                            @if(isset($file['size']) && $file['size'] > 0)
+                                                {{ number_format($file['size']) }} bytes
+                                            @else
+                                                0 bytes
+                                            @endif
+                                            • {{ strtoupper($file['type']) }}
+                                            @if(isset($file['exists']) && !$file['exists'])
                                             <span class="text-red-500">• File missing</span>
                                             @endif
                                         </p>

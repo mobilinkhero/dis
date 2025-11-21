@@ -112,6 +112,7 @@ class PersonalAssistantFileService
                 'type' => $file->getClientOriginalExtension(),
                 'mime_type' => $file->getMimeType(),
                 'uploaded_at' => now()->toISOString(),
+                'exists' => true,
             ];
 
             return [

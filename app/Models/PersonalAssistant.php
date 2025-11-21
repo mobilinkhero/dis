@@ -227,6 +227,31 @@ class PersonalAssistant extends Model
     }
 
     /**
+     * Get uploaded files with current existence status
+     */
+    public function getFilesWithStatus(): array
+    {
+        $files = $this->uploaded_files ?? [];
+        
+        // Check file existence for each file
+        foreach ($files as &$file) {
+            if (isset($file['path'])) {
+                $fullPath = storage_path('app/private/assistants/' . $this->tenant_id . '/' . $file['path']);
+                $file['exists'] = file_exists($fullPath);
+                
+                // Update size if file exists and size is missing or zero
+                if ($file['exists'] && (!isset($file['size']) || $file['size'] === 0)) {
+                    $file['size'] = filesize($fullPath);
+                }
+            } else {
+                $file['exists'] = false;
+            }
+        }
+        
+        return $files;
+    }
+
+    /**
      * Boot the model
      */
     protected static function boot()
