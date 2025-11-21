@@ -355,11 +355,27 @@ class GoogleSheetsService
                     // Pad row to match header length
                     $row = array_pad($row, count($header), '');
                     
+                    EcommerceLogger::info('🔄 CSV Processing row', [
+                        'line_index' => $lineIndex,
+                        'row_data' => $row,
+                        'header' => $header
+                    ]);
+                    
                     // Use dynamic mapper to transform row data
                     $productData = $this->dynamicMapper->mapRowToProduct($row, $header);
                     
+                    EcommerceLogger::info('✅ CSV Mapped product data', [
+                        'line_index' => $lineIndex,
+                        'product_data' => $productData
+                    ]);
+                    
+                    // Validate required fields
+                    if (empty($productData['name']) || empty($productData['sku'])) {
+                        throw new \Exception('Missing required fields: name or sku. Name: ' . ($productData['name'] ?? 'empty') . ', SKU: ' . ($productData['sku'] ?? 'empty'));
+                    }
+                    
                     // Upsert product
-                    Product::updateOrCreate(
+                    $product = Product::updateOrCreate(
                         [
                             'tenant_id' => $this->tenantId,
                             'sku' => $productData['sku']
@@ -367,13 +383,30 @@ class GoogleSheetsService
                         $productData
                     );
                     
+                    EcommerceLogger::info('💾 CSV Product saved', [
+                        'line_index' => $lineIndex,
+                        'product_id' => $product->id,
+                        'sku' => $product->sku,
+                        'name' => $product->name
+                    ]);
+                    
                     $syncedCount++;
                 } catch (\Exception $e) {
-                    EcommerceLogger::error('Product sync error', [
+                    EcommerceLogger::error('❌ CSV Product sync error', [
                         'line_index' => $lineIndex,
+                        'line_data' => $line,
+                        'row_data' => $row ?? null,
                         'error' => $e->getMessage(),
-                        'line_data' => $line
+                        'trace' => $e->getTraceAsString()
                     ]);
+                    
+                    // Also log to console
+                    \Log::error("CSV Line {$lineIndex} sync failed: " . $e->getMessage(), [
+                        'line' => $line,
+                        'row' => $row ?? null,
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                    
                     $errorCount++;
                 }
             }
@@ -387,12 +420,34 @@ class GoogleSheetsService
             EcommerceLogger::info('Product sync completed successfully', [
                 'tenant_id' => $this->tenantId,
                 'synced_count' => $syncedCount,
-                'error_count' => $errorCount
+                'error_count' => $errorCount,
+                'total_lines_processed' => count($lines)
             ]);
+            
+            // Log to console with summary
+            \Log::info("
+╔══════════════════════════════════════════════════════════════
+║ 📊 SYNC COMPLETED - CSV Export Method
+╠══════════════════════════════════════════════════════════════
+║ Tenant ID: {$this->tenantId}
+║ ✅ Successfully Synced: {$syncedCount} products
+║ ❌ Errors: {$errorCount}
+║ 📋 Total Lines Processed: " . count($lines) . "
+║ 
+║ 💡 To see detailed errors, check:
+║    storage/logs/ecomorcelog.log
+║    storage/logs/laravel.log
+╚══════════════════════════════════════════════════════════════
+            ");
+
+            $message = "Synced {$syncedCount} products successfully.";
+            if ($errorCount > 0) {
+                $message .= " ⚠️ {$errorCount} errors occurred. Check logs: storage/logs/ecomorcelog.log for details.";
+            }
 
             return [
                 'success' => true,
-                'message' => "Synced {$syncedCount} products successfully. {$errorCount} errors.",
+                'message' => $message,
                 'synced' => $syncedCount,
                 'errors' => $errorCount
             ];
@@ -499,11 +554,27 @@ class GoogleSheetsService
                     // Pad row to match header length
                     $row = array_pad($row, count($header), '');
                     
+                    EcommerceLogger::info('🔄 Processing row', [
+                        'row_index' => $rowIndex,
+                        'row_data' => $row,
+                        'header' => $header
+                    ]);
+                    
                     // Use dynamic mapper to transform row data
                     $productData = $this->dynamicMapper->mapRowToProduct($row, $header);
                     
+                    EcommerceLogger::info('✅ Mapped product data', [
+                        'row_index' => $rowIndex,
+                        'product_data' => $productData
+                    ]);
+                    
+                    // Validate required fields
+                    if (empty($productData['name']) || empty($productData['sku'])) {
+                        throw new \Exception('Missing required fields: name or sku. Name: ' . ($productData['name'] ?? 'empty') . ', SKU: ' . ($productData['sku'] ?? 'empty'));
+                    }
+                    
                     // Upsert product
-                    Product::updateOrCreate(
+                    $product = Product::updateOrCreate(
                         [
                             'tenant_id' => $this->tenantId,
                             'sku' => $productData['sku']
@@ -511,12 +582,28 @@ class GoogleSheetsService
                         $productData
                     );
                     
+                    EcommerceLogger::info('💾 Product saved', [
+                        'row_index' => $rowIndex,
+                        'product_id' => $product->id,
+                        'sku' => $product->sku,
+                        'name' => $product->name
+                    ]);
+                    
                     $syncedCount++;
                 } catch (\Exception $e) {
-                    EcommerceLogger::error('Product sync error', [
+                    EcommerceLogger::error('❌ Product sync error', [
                         'row_index' => $rowIndex,
-                        'error' => $e->getMessage()
+                        'row_data' => $row,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
                     ]);
+                    
+                    // Also log to console for immediate debugging
+                    \Log::error("Row {$rowIndex} sync failed: " . $e->getMessage(), [
+                        'row' => $row,
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                    
                     $errorCount++;
                 }
             }
@@ -530,12 +617,34 @@ class GoogleSheetsService
             EcommerceLogger::info('Product sync completed with Service Account', [
                 'tenant_id' => $this->tenantId,
                 'synced_count' => $syncedCount,
-                'error_count' => $errorCount
+                'error_count' => $errorCount,
+                'total_rows_processed' => count($rows)
             ]);
+            
+            // Also log to console with prominent message
+            \Log::info("
+╔══════════════════════════════════════════════════════════════
+║ 📊 SYNC COMPLETED - Service Account Method
+╠══════════════════════════════════════════════════════════════
+║ Tenant ID: {$this->tenantId}
+║ ✅ Successfully Synced: {$syncedCount} products
+║ ❌ Errors: {$errorCount}
+║ 📋 Total Rows Processed: " . count($rows) . "
+║ 
+║ 💡 To see detailed errors, check:
+║    storage/logs/ecomorcelog.log
+║    storage/logs/laravel.log
+╚══════════════════════════════════════════════════════════════
+            ");
+
+            $message = "Synced {$syncedCount} products successfully using Service Account.";
+            if ($errorCount > 0) {
+                $message .= " ⚠️ {$errorCount} errors occurred. Check logs: storage/logs/ecomorcelog.log for details.";
+            }
 
             return [
                 'success' => true,
-                'message' => "Synced {$syncedCount} products successfully using Service Account. {$errorCount} errors.",
+                'message' => $message,
                 'synced' => $syncedCount,
                 'errors' => $errorCount
             ];

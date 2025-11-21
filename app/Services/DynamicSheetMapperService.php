@@ -109,60 +109,132 @@ class DynamicSheetMapperService
      */
     public function mapRowToProduct(array $sheetRow, array $headers): array
     {
-        // Combine headers with row data
-        $rowData = array_combine($headers, $sheetRow);
-        
-        $mapping = $this->configuration->column_mapping ?? [];
-        
-        // Core product data
-        $productData = [
-            'tenant_id' => $this->tenantId,
-        ];
-
-        // Map standard fields
-        $standardFields = [
-            'google_sheet_row_id', 'sku', 'name', 'description', 'price', 
-            'sale_price', 'cost_price', 'stock_quantity', 'low_stock_threshold',
-            'category', 'subcategory', 'weight', 'status', 'featured'
-        ];
-
-        foreach ($mapping as $sheetColumn => $dbField) {
-            if (in_array($dbField, $standardFields)) {
-                $value = $rowData[$sheetColumn] ?? null;
-                $productData[$dbField] = $this->castValue($dbField, $value);
+        try {
+            EcommerceLogger::info('🗺️ Starting mapRowToProduct', [
+                'tenant_id' => $this->tenantId,
+                'headers_count' => count($headers),
+                'row_count' => count($sheetRow),
+                'headers' => $headers,
+                'row' => $sheetRow
+            ]);
+            
+            // Combine headers with row data
+            if (count($headers) !== count($sheetRow)) {
+                EcommerceLogger::warning('⚠️ Header/Row count mismatch', [
+                    'headers_count' => count($headers),
+                    'row_count' => count($sheetRow)
+                ]);
             }
-        }
-
-        // Handle special array fields (tags, images)
-        if (isset($mapping['tags'])) {
-            $tagsColumn = array_search('tags', $mapping);
-            $tagsValue = $rowData[$tagsColumn] ?? '';
-            $productData['tags'] = $this->parseArrayField($tagsValue);
-        }
-
-        if (isset($mapping['images'])) {
-            $imagesColumn = array_search('images', $mapping);
-            $imagesValue = $rowData[$imagesColumn] ?? '';
-            $productData['images'] = $this->parseArrayField($imagesValue);
-        }
-
-        // Collect all custom fields into meta_data
-        $customFields = [];
-        foreach ($mapping as $sheetColumn => $dbField) {
-            if (str_starts_with($dbField, 'custom_')) {
-                $customFields[$dbField] = $rowData[$sheetColumn] ?? null;
+            
+            $rowData = array_combine($headers, $sheetRow);
+            
+            EcommerceLogger::info('🔗 Combined row data', [
+                'row_data' => $rowData
+            ]);
+            
+            $mapping = $this->configuration->column_mapping ?? [];
+            
+            if (empty($mapping)) {
+                throw new \Exception('No column mapping found. Please run sync to detect columns first.');
             }
+            
+            EcommerceLogger::info('📋 Using column mapping', [
+                'mapping' => $mapping
+            ]);
+            
+            // Core product data
+            $productData = [
+                'tenant_id' => $this->tenantId,
+            ];
+
+            // Map standard fields
+            $standardFields = [
+                'google_sheet_row_id', 'sku', 'name', 'description', 'price', 
+                'sale_price', 'cost_price', 'stock_quantity', 'low_stock_threshold',
+                'category', 'subcategory', 'weight', 'status', 'featured'
+            ];
+
+            foreach ($mapping as $sheetColumn => $dbField) {
+                if (in_array($dbField, $standardFields)) {
+                    $value = $rowData[$sheetColumn] ?? null;
+                    $productData[$dbField] = $this->castValue($dbField, $value);
+                    
+                    EcommerceLogger::info("  ✅ Mapped {$sheetColumn} → {$dbField}", [
+                        'value' => $value,
+                        'casted_value' => $productData[$dbField]
+                    ]);
+                }
+            }
+
+            // Handle special array fields (tags, images)
+            foreach ($mapping as $sheetColumn => $dbField) {
+                if ($dbField === 'tags') {
+                    $tagsValue = $rowData[$sheetColumn] ?? '';
+                    $productData['tags'] = $this->parseArrayField($tagsValue);
+                    EcommerceLogger::info("  📋 Mapped tags", ['value' => $productData['tags']]);
+                }
+                
+                if ($dbField === 'images') {
+                    $imagesValue = $rowData[$sheetColumn] ?? '';
+                    $productData['images'] = $this->parseArrayField($imagesValue);
+                    EcommerceLogger::info("  🖼️ Mapped images", ['value' => $productData['images']]);
+                }
+            }
+
+            // Collect all custom fields into meta_data
+            $customFields = [];
+            foreach ($mapping as $sheetColumn => $dbField) {
+                if (str_starts_with($dbField, 'custom_')) {
+                    $customFields[$dbField] = $rowData[$sheetColumn] ?? null;
+                }
+            }
+
+            if (!empty($customFields)) {
+                $productData['meta_data'] = $customFields;
+                EcommerceLogger::info("  🎨 Custom fields", ['custom_fields' => $customFields]);
+            }
+
+            // Set sync metadata
+            $productData['sync_status'] = 'synced';
+            $productData['last_synced_at'] = Carbon::now();
+            
+            // Ensure required fields exist
+            if (!isset($productData['name']) || empty($productData['name'])) {
+                throw new \Exception('Product name is required but not found in mapping or is empty');
+            }
+            
+            if (!isset($productData['sku'])) {
+                // Generate SKU from name if not provided
+                $productData['sku'] = 'AUTO-' . strtoupper(substr(md5($productData['name']), 0, 8));
+                EcommerceLogger::warning('⚠️ SKU not found, generated automatically', [
+                    'generated_sku' => $productData['sku']
+                ]);
+            }
+            
+            if (!isset($productData['price']) || $productData['price'] === null) {
+                $productData['price'] = 0;
+                EcommerceLogger::warning('⚠️ Price not found, set to 0', [
+                    'product_name' => $productData['name']
+                ]);
+            }
+
+            EcommerceLogger::info('✅ Final mapped product data', [
+                'product_data' => $productData
+            ]);
+
+            return $productData;
+            
+        } catch (\Exception $e) {
+            EcommerceLogger::error('❌ mapRowToProduct failed', [
+                'tenant_id' => $this->tenantId,
+                'error' => $e->getMessage(),
+                'headers' => $headers,
+                'row' => $sheetRow,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            throw $e;
         }
-
-        if (!empty($customFields)) {
-            $productData['meta_data'] = $customFields;
-        }
-
-        // Set sync metadata
-        $productData['sync_status'] = 'synced';
-        $productData['last_synced_at'] = Carbon::now();
-
-        return $productData;
     }
 
     /**
