@@ -85,14 +85,14 @@ class EcommerceDashboard extends Component
             ]);
 
             $sheetsService = new GoogleSheetsService();
-            $result = $sheetsService->syncProducts($this->config);
+            $result = $sheetsService->syncProductsFromSheets();
             
             if ($result['success']) {
-                EcommerceLogger::sheetsSync('manual_products', 'success', $result);
+                EcommerceLogger::info('Manual sync successful', ['result' => $result]);
                 $this->notify(['type' => 'success', 'message' => $result['message']]);
                 $this->loadStats(); // Refresh stats
             } else {
-                EcommerceLogger::sheetsSync('manual_products', 'failed', $result);
+                EcommerceLogger::error('Manual sync failed', ['result' => $result]);
                 $this->notify(['type' => 'danger', 'message' => $result['message']]);
             }
         } catch (\Exception $e) {
@@ -102,6 +102,59 @@ class EcommerceDashboard extends Component
                 'stack_trace' => $e->getTraceAsString()
             ]);
             $this->notify(['type' => 'danger', 'message' => 'Sync failed: ' . $e->getMessage()]);
+        }
+    }
+
+    public function clearAllProducts()
+    {
+        try {
+            $tenantId = tenant_id();
+            $productCount = Product::where('tenant_id', $tenantId)->count();
+
+            if ($productCount === 0) {
+                $this->notify([
+                    'type' => 'info',
+                    'message' => 'No products to clear.'
+                ]);
+                return;
+            }
+
+            EcommerceLogger::info('Product clear initiated from dashboard', [
+                'tenant_id' => $tenantId,
+                'user_id' => auth()->id(),
+                'product_count' => $productCount
+            ]);
+
+            // Delete all products for this tenant
+            $deletedCount = Product::where('tenant_id', $tenantId)->delete();
+
+            // Also clear dynamic mapper configuration
+            \App\Models\Tenant\TenantSheetConfiguration::where('tenant_id', $tenantId)
+                ->where('sheet_type', 'products')
+                ->delete();
+
+            EcommerceLogger::info('Products cleared successfully from dashboard', [
+                'tenant_id' => $tenantId,
+                'deleted_count' => $deletedCount
+            ]);
+
+            $this->notify([
+                'type' => 'success',
+                'message' => "Successfully cleared {$deletedCount} products. Sync again to get products from your new sheet."
+            ]);
+
+            $this->loadStats(); // Refresh stats to show 0 products
+
+        } catch (\Exception $e) {
+            EcommerceLogger::error('Product clear failed', [
+                'tenant_id' => tenant_id(),
+                'exception' => $e->getMessage()
+            ]);
+
+            $this->notify([
+                'type' => 'danger',
+                'message' => 'Failed to clear products: ' . $e->getMessage()
+            ]);
         }
     }
 
