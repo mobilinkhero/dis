@@ -131,117 +131,92 @@
 
     <!-- Products Table -->
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            <button wire:click="sortBy('name')" class="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200">
-                                Product
-                                @if($sortBy === 'name')
-                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="{{ $sortDirection === 'asc' ? 'M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z' : 'M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' }}"/>
-                                    </svg>
-                                @endif
-                            </button>
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Price</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Stock</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
-                    @forelse($products as $product)
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td class="px-6 py-4">
-                                <div class="flex items-center">
-                                    <div class="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded-lg flex items-center justify-center mr-4">
-                                        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        @if(!$tableExists)
+            <div class="p-12 text-center">
+                <div class="w-16 h-16 bg-orange-100 dark:bg-orange-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Product Table Found</h3>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">Table <code class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">{{ $tableName }}</code> doesn't exist yet.</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Sync your Google Sheets to create the product table automatically.</p>
+                <button wire:click="syncProducts" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                    🔄 Sync Products from Google Sheets
+                </button>
+            </div>
+        @else
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">#</th>
+                            @foreach($columns as $column)
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    {{ ucwords(str_replace('_', ' ', $column)) }}
+                                </th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+                        @forelse($products as $index => $product)
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                                    {{ ($currentPage - 1) * $perPage + $index + 1 }}
+                                </td>
+                                @foreach($columns as $column)
+                                    <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                        @php
+                                            $value = $product->$column ?? '';
+                                            // Truncate long values
+                                            if (strlen($value) > 50) {
+                                                $value = substr($value, 0, 50) . '...';
+                                            }
+                                        @endphp
+                                        {{ $value }}
+                                    </td>
+                                @endforeach
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="{{ count($columns) + 1 }}" class="px-6 py-12 text-center">
+                                    <div class="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                         </svg>
                                     </div>
-                                    <div>
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white">{{ $product->name }}</div>
-                                        <div class="text-sm text-gray-500 dark:text-gray-400">SKU: {{ $product->sku ?? 'N/A' }}</div>
-                                        @if($product->featured)
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-800/50 dark:text-purple-200">
-                                                ⭐ Featured
-                                            </span>
-                                        @endif
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900 dark:text-white">
-                                    ${{ number_format($product->effective_price, 2) }}
-                                    @if($product->is_on_sale)
-                                        <span class="text-xs text-gray-500 line-through ml-1">${{ number_format($product->price, 2) }}</span>
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800/50 dark:text-red-200 ml-1">
-                                            Sale
-                                        </span>
-                                    @endif
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900 dark:text-white">{{ $product->stock_quantity }}</div>
-                                @if($product->is_low_stock)
-                                    <div class="text-xs text-orange-600 dark:text-orange-400">Low Stock</div>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900 dark:text-white">{{ $product->category ?: 'Uncategorized' }}</div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                                    {{ $product->status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-800/50 dark:text-green-200' : '' }}
-                                    {{ $product->status === 'inactive' ? 'bg-red-100 text-red-800 dark:bg-red-800/50 dark:text-red-200' : '' }}
-                                    {{ $product->status === 'draft' ? 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-200' : '' }}">
-                                    {{ ucfirst($product->status) }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <div class="flex items-center gap-2">
-                                    <button wire:click="editProduct({{ $product->id }})" 
-                                            class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
-                                        Edit
+                                    <p class="text-gray-500 dark:text-gray-400 mb-4">No products found</p>
+                                    <button wire:click="syncProducts" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                                        🔄 Sync from Google Sheets
                                     </button>
-                                    <button wire:click="toggleFeatured({{ $product->id }})" 
-                                            class="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300">
-                                        {{ $product->featured ? 'Unfeature' : 'Feature' }}
-                                    </button>
-                                    <button wire:click="deleteProduct({{ $product->id }})" 
-                                            onclick="return confirm('Are you sure?')"
-                                            class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                                        Delete
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="px-6 py-12 text-center">
-                                <div class="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                    </svg>
-                                </div>
-                                <p class="text-gray-500 dark:text-gray-400 mb-4">No products found</p>
-                                <button wire:click="createProduct" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                    Add Your First Product
-                                </button>
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        @if($products->hasPages())
-            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-600">
-                {{ $products->links() }}
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
+
+            @if($total > $perPage)
+                <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-600">
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm text-gray-700 dark:text-gray-300">
+                            Showing {{ ($currentPage - 1) * $perPage + 1 }} to {{ min($currentPage * $perPage, $total) }} of {{ $total }} products
+                        </div>
+                        <div class="flex gap-2">
+                            @if($currentPage > 1)
+                                <a href="?page={{ $currentPage - 1 }}" class="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600">
+                                    Previous
+                                </a>
+                            @endif
+                            @if($currentPage * $perPage < $total)
+                                <a href="?page={{ $currentPage + 1 }}" class="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600">
+                                    Next
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
         @endif
     </div>
 

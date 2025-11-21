@@ -5,6 +5,9 @@ namespace App\Livewire\Tenant\Ecommerce;
 use App\Models\Tenant\Product;
 use App\Models\Tenant\EcommerceConfiguration;
 use App\Services\GoogleSheetsService;
+use App\Services\DynamicTenantTableService;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -219,55 +222,89 @@ class ProductManager extends Component
 
     public function render()
     {
-        $query = Product::where('tenant_id', tenant_id());
-
-        // Apply search filter
+        $tenantId = tenant_id();
+        $tableService = new DynamicTenantTableService();
+        $tableName = $tableService->getTenantTableName($tenantId);
+        
+        // Check if table exists
+        if (!Schema::hasTable($tableName)) {
+            return view('livewire.tenant.ecommerce.product-manager', [
+                'products' => collect(),
+                'categories' => collect(),
+                'stats' => ['total' => 0, 'active' => 0, 'low_stock' => 0, 'featured' => 0],
+                'columns' => [],
+                'tableName' => $tableName,
+                'tableExists' => false,
+            ]);
+        }
+        
+        // Get all columns from the table
+        $columns = Schema::getColumnListing($tableName);
+        $columns = array_diff($columns, ['id', 'created_at', 'updated_at']); // Remove default columns
+        
+        // Build dynamic query
+        $query = DB::table($tableName);
+        
+        // Apply search filter (search across all text columns)
         if ($this->search) {
-            $query->where(function($q) {
-                $q->where('name', 'like', '%' . $this->search . '%')
-                  ->orWhere('sku', 'like', '%' . $this->search . '%')
-                  ->orWhere('description', 'like', '%' . $this->search . '%');
+            $query->where(function($q) use ($columns) {
+                foreach ($columns as $column) {
+                    $q->orWhere($column, 'like', '%' . $this->search . '%');
+                }
             });
         }
-
-        // Apply category filter
-        if ($this->categoryFilter) {
+        
+        // Apply category filter if category column exists
+        if ($this->categoryFilter && in_array('category', $columns)) {
             $query->where('category', $this->categoryFilter);
         }
-
-        // Apply status filter
-        if ($this->statusFilter !== 'all') {
-            if ($this->statusFilter === 'low_stock') {
-                $query->whereRaw('stock_quantity <= low_stock_threshold');
-            } else {
-                $query->where('status', $this->statusFilter);
-            }
+        
+        // Apply status filter if status column exists
+        if ($this->statusFilter !== 'all' && in_array('status', $columns)) {
+            $query->where('status', $this->statusFilter);
         }
-
-        // Apply sorting
-        $query->orderBy($this->sortBy, $this->sortDirection);
-
-        $products = $query->paginate(20);
-
-        // Get categories for filter
-        $categories = Product::where('tenant_id', tenant_id())
-            ->whereNotNull('category')
-            ->where('category', '!=', '')
-            ->distinct()
-            ->pluck('category');
-
+        
+        // Apply sorting if column exists
+        if (in_array($this->sortBy, $columns)) {
+            $query->orderBy($this->sortBy, $this->sortDirection);
+        } else {
+            $query->orderBy('id', 'desc');
+        }
+        
+        // Paginate
+        $perPage = 20;
+        $page = request()->get('page', 1);
+        $total = $query->count();
+        $products = $query->skip(($page - 1) * $perPage)->take($perPage)->get();
+        
+        // Get categories for filter (if category column exists)
+        $categories = collect();
+        if (in_array('category', $columns)) {
+            $categories = DB::table($tableName)
+                ->whereNotNull('category')
+                ->where('category', '!=', '')
+                ->distinct()
+                ->pluck('category');
+        }
+        
         // Get stats
         $stats = [
-            'total' => Product::where('tenant_id', tenant_id())->count(),
-            'active' => Product::where('tenant_id', tenant_id())->where('status', 'active')->count(),
-            'low_stock' => Product::where('tenant_id', tenant_id())->whereRaw('stock_quantity <= low_stock_threshold')->count(),
-            'featured' => Product::where('tenant_id', tenant_id())->where('featured', true)->count(),
+            'total' => DB::table($tableName)->count(),
+            'active' => in_array('status', $columns) ? DB::table($tableName)->where('status', 'Active')->count() : 0,
+            'low_stock' => 0,
+            'featured' => 0,
         ];
-
+        
         return view('livewire.tenant.ecommerce.product-manager', [
             'products' => $products,
             'categories' => $categories,
             'stats' => $stats,
+            'columns' => $columns,
+            'tableName' => $tableName,
+            'tableExists' => true,
+            'total' => $total,
+            'perPage' => $perPage,
+            'currentPage' => $page,
         ]);
     }
 }
