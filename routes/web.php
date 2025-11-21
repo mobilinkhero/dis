@@ -132,3 +132,16 @@ Route::fallback(function () {
 
 Route::get('/api/translations/{locale?}', [TranslationController::class, 'index'])
     ->name('api.translations');
+
+// AI E-Commerce Visual Interfaces
+Route::get('/ai-dashboard', function () {
+    return view('dashboard.ai-analytics');
+})->name('ai.dashboard');
+
+Route::get('/visual-search', function () {
+    return view('customer.visual-search');
+})->name('visual.search');
+
+Route::get('/ar-tryout', function () {
+    return view('customer.ar-tryout');
+})->name('ar.tryout');
