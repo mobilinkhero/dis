@@ -17,14 +17,23 @@ class DynamicTenantTableService
         try {
             $tableName = "tenant_{$tenantId}_products";
             
+            Log::info("🔨 Starting table creation", [
+                'table_name' => $tableName,
+                'headers' => $headers,
+                'header_count' => count($headers)
+            ]);
+            
             // Drop if exists (fresh start)
             if (Schema::hasTable($tableName)) {
                 Schema::drop($tableName);
-                Log::info("Dropped existing table: {$tableName}");
+                Log::info("✅ Dropped existing table: {$tableName}");
             }
             
+            // Prepare columns info for logging
+            $columnsToCreate = [];
+            
             // Create new table with dynamic columns
-            Schema::create($tableName, function (Blueprint $table) use ($headers) {
+            Schema::create($tableName, function (Blueprint $table) use ($headers, &$columnsToCreate) {
                 // Standard columns
                 $table->id();
                 $table->timestamps();
@@ -35,32 +44,36 @@ class DynamicTenantTableService
                     
                     // Skip if empty or invalid
                     if (empty($columnName) || $columnName === '_') {
+                        Log::warning("⚠️ Skipped invalid column", ['header' => $header]);
                         continue;
                     }
                     
                     // Determine column type based on header name
                     $this->addDynamicColumn($table, $columnName, $header);
-                }
-                
-                // Add indexes for common fields
-                if (Schema::hasColumn($tableName, 'product_id')) {
-                    $table->index('product_id');
-                }
-                if (Schema::hasColumn($tableName, 'status')) {
-                    $table->index('status');
+                    $columnsToCreate[] = $columnName;
+                    
+                    Log::info("  ✅ Added column: {$columnName}");
                 }
             });
             
-            Log::info("Created tenant table: {$tableName}", [
-                'columns' => count($headers)
+            // Verify table was created
+            if (!Schema::hasTable($tableName)) {
+                throw new \Exception("Table was not created successfully");
+            }
+            
+            Log::info("✅ Successfully created tenant table", [
+                'table_name' => $tableName,
+                'total_columns' => count($columnsToCreate),
+                'columns' => $columnsToCreate
             ]);
             
             return true;
             
         } catch (\Exception $e) {
-            Log::error("Failed to create tenant table", [
+            Log::error("❌ Failed to create tenant table", [
                 'tenant_id' => $tenantId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             
             return false;

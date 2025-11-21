@@ -478,15 +478,23 @@ class GoogleSheetsService
                 'total_columns' => count($header)
             ]);
             
+            // Also log to browser console
+            \Log::channel('single')->info('🔧 BROWSER: Creating table tenant_' . $this->tenantId . '_products with ' . count($header) . ' columns');
+            
             // Create tenant-specific table with columns matching sheet
             $tableCreated = $this->tableService->createTenantProductsTable($this->tenantId, $header);
             
             if (!$tableCreated) {
+                $errorMsg = 'Failed to create tenant products table. Check storage/logs/laravel.log for details.';
+                \Log::channel('single')->error('🔧 BROWSER ERROR: ' . $errorMsg);
+                
                 return [
                     'success' => false,
-                    'message' => 'Failed to create tenant products table'
+                    'message' => $errorMsg
                 ];
             }
+            
+            \Log::channel('single')->info('🔧 BROWSER: Table created successfully!');
             
             EcommerceLogger::info('✅ Tenant table created with dynamic columns', [
                 'tenant_id' => $this->tenantId,
