@@ -6,6 +6,7 @@ use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Personal Assistant Model
@@ -172,21 +173,6 @@ class PersonalAssistant extends Model
         return $context;
     }
 
-    /**
-     * Get file upload information
-     */
-    public function getUploadedFilesAttribute($value)
-    {
-        $files = json_decode($value, true) ?: [];
-        
-        // Add full paths and check if files exist
-        return collect($files)->map(function ($file) {
-            $fullPath = storage_path('app/tenant-files/' . $this->tenant_id . '/' . $file['path']);
-            $file['exists'] = file_exists($fullPath);
-            $file['size'] = $file['exists'] ? filesize($fullPath) : 0;
-            return $file;
-        })->toArray();
-    }
 
     /**
      * Get use case badges for display
@@ -236,12 +222,12 @@ class PersonalAssistant extends Model
         // Check file existence for each file
         foreach ($files as &$file) {
             if (isset($file['path'])) {
-                $fullPath = storage_path('app/private/assistants/' . $this->tenant_id . '/' . $file['path']);
-                $file['exists'] = file_exists($fullPath);
+                // Use Storage facade for consistent file checking
+                $file['exists'] = Storage::exists($file['path']);
                 
                 // Update size if file exists and size is missing or zero
                 if ($file['exists'] && (!isset($file['size']) || $file['size'] === 0)) {
-                    $file['size'] = filesize($fullPath);
+                    $file['size'] = Storage::size($file['path']);
                 }
             } else {
                 $file['exists'] = false;

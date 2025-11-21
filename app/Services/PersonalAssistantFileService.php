@@ -107,7 +107,8 @@ class PersonalAssistantFileService
             // Prepare file info
             $fileInfo = [
                 'original_name' => $file->getClientOriginalName(),
-                'path' => $fileName,
+                'path' => $filePath,
+                'filename' => $fileName,
                 'size' => $file->getSize(),
                 'type' => $file->getClientOriginalExtension(),
                 'mime_type' => $file->getMimeType(),

@@ -231,6 +231,17 @@ class PersonalAssistantManager extends Component
         }
     }
 
+    public function refreshFileStatus()
+    {
+        if (!$this->assistant) {
+            return;
+        }
+
+        // Force refresh of file status
+        $this->assistant->refresh();
+        session()->flash('success', 'File status refreshed');
+    }
+
     public function updatedUseCaseTags()
     {
         // Auto-update system instructions based on selected use cases
