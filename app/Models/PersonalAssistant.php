@@ -90,11 +90,11 @@ class PersonalAssistant extends Model
      */
     public static function getForCurrentTenant(): ?self
     {
-        if (!Tenant::checkCurrent()) {
+        $tenant = static::getCurrentTenant();
+        if (!$tenant) {
             return null;
         }
 
-        $tenant = Tenant::current();
         return static::where('tenant_id', $tenant->id)
             ->where('is_active', true)
             ->first();
@@ -105,7 +105,7 @@ class PersonalAssistant extends Model
      */
     public static function createOrUpdateForTenant(array $data): self
     {
-        $tenant = Tenant::current();
+        $tenant = static::getCurrentTenant();
         if (!$tenant) {
             throw new \Exception('No current tenant found');
         }
@@ -122,6 +122,38 @@ class PersonalAssistant extends Model
         }
 
         return $assistant;
+    }
+
+    /**
+     * Get current tenant with fallback methods
+     */
+    protected static function getCurrentTenant()
+    {
+        try {
+            // Primary method: Use session-based tenant identification
+            $tenantId = session('current_tenant_id');
+
+            if ($tenantId) {
+                $tenant = Tenant::find($tenantId);
+                if ($tenant instanceof Tenant) {
+                    return $tenant;
+                }
+            }
+
+            // Fallback method: Use traditional tenant context
+            if (Tenant::checkCurrent()) {
+                $tenant = Tenant::current();
+                if ($tenant instanceof Tenant) {
+                    // Sync session with current tenant for consistency
+                    session(['current_tenant_id' => $tenant->id]);
+                    return $tenant;
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     /**

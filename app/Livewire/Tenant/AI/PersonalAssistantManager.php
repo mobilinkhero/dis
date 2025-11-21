@@ -3,6 +3,7 @@
 namespace App\Livewire\Tenant\AI;
 
 use App\Models\PersonalAssistant;
+use App\Models\Tenant;
 use App\Services\PersonalAssistantFileService;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -43,6 +44,38 @@ class PersonalAssistantManager extends Component
         'files.*.max' => 'Each file must be smaller than 5MB',
         'files.*.mimes' => 'Only text, markdown, CSV, JSON files are supported currently',
     ];
+
+    /**
+     * Get the current tenant using session-based context with fallback
+     */
+    protected function getCurrentTenant()
+    {
+        try {
+            // Primary method: Use session-based tenant identification
+            $tenantId = session('current_tenant_id');
+
+            if ($tenantId) {
+                $tenant = Tenant::find($tenantId);
+                if ($tenant instanceof Tenant) {
+                    return $tenant;
+                }
+            }
+
+            // Fallback method: Use traditional tenant context
+            if (Tenant::checkCurrent()) {
+                $tenant = Tenant::current();
+                if ($tenant instanceof Tenant) {
+                    // Sync session with current tenant for consistency
+                    session(['current_tenant_id' => $tenant->id]);
+                    return $tenant;
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
 
     public function mount()
     {
