@@ -257,6 +257,6 @@ class PersonalAssistantManager extends Component
         return view('livewire.tenant.ai.personal-assistant-manager', [
             'availableModels' => PersonalAssistant::AVAILABLE_MODELS,
             'useCaseOptions' => PersonalAssistant::USE_CASES,
-        ])->layout('layouts.tenant');
+        ]);
     }
 }
