@@ -18,7 +18,7 @@
     
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <!-- AI Analytics Dashboard -->
-        <a href="{{ tenant_route('tenant.ai.dashboard') }}" 
+        <a href="{{ tenant_route('tenant.ecommerce.ai-dashboard') }}" 
            class="bg-white bg-opacity-10 hover:bg-opacity-20 rounded-lg p-4 transition-all duration-300 hover:transform hover:scale-105 group">
             <div class="flex items-center mb-3">
                 <svg class="w-6 h-6 mr-2 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -32,7 +32,7 @@
         </a>
         
         <!-- Visual Search -->
-        <a href="{{ tenant_route('tenant.visual.search') }}" 
+        <a href="{{ tenant_route('tenant.ecommerce.visual-search') }}" 
            class="bg-white bg-opacity-10 hover:bg-opacity-20 rounded-lg p-4 transition-all duration-300 hover:transform hover:scale-105 group">
             <div class="flex items-center mb-3">
                 <svg class="w-6 h-6 mr-2 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -46,7 +46,7 @@
         </a>
         
         <!-- AR Try-On -->
-        <a href="{{ tenant_route('tenant.ar.tryout') }}" 
+        <a href="{{ tenant_route('tenant.ecommerce.ar-tryout') }}" 
            class="bg-white bg-opacity-10 hover:bg-opacity-20 rounded-lg p-4 transition-all duration-300 hover:transform hover:scale-105 group">
             <div class="flex items-center mb-3">
                 <svg class="w-6 h-6 mr-2 text-pink-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
