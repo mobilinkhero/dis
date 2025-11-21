@@ -3,8 +3,7 @@
 namespace App\Services;
 
 use App\Models\Tenant\CustomerProfile;
-use App\Models\Tenant\EcommerceOrder;
-use App\Models\Tenant\CustomerInteraction;
+use App\Models\Tenant\Order;
 use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
@@ -111,7 +110,7 @@ class CustomerProfileService
         }
 
         // Calculate updated metrics
-        $orders = EcommerceOrder::where('tenant_id', $this->tenantId)
+        $orders = Order::where('tenant_id', $this->tenantId)
             ->where('contact_id', $profile->contact_id)
             ->get();
 
@@ -153,12 +152,18 @@ class CustomerProfileService
         $categoryCount = [];
         
         foreach ($orders as $order) {
-            $items = json_decode($order->order_items, true) ?? [];
+            $items = is_string($order->items) ? json_decode($order->items, true) : $order->items;
+            $items = $items ?? [];
+            
             foreach ($items as $item) {
-                $product = \App\Models\Tenant\Product::find($item['product_id']);
-                if ($product) {
-                    $category = $product->category;
-                    $categoryCount[$category] = ($categoryCount[$category] ?? 0) + $item['quantity'];
+                $productId = $item['product_id'] ?? null;
+                if ($productId) {
+                    $product = \App\Models\Tenant\Product::find($productId);
+                    if ($product && $product->category) {
+                        $category = $product->category;
+                        $quantity = $item['quantity'] ?? 1;
+                        $categoryCount[$category] = ($categoryCount[$category] ?? 0) + $quantity;
+                    }
                 }
             }
         }
@@ -297,17 +302,14 @@ class CustomerProfileService
      */
     public function trackInteraction($contact, string $type, array $data = []): void
     {
-        CustomerInteraction::create([
-            'tenant_id' => $this->tenantId,
-            'contact_id' => $contact->id,
-            'interaction_type' => $type,
-            'interaction_data' => $data,
-            'created_at' => now()
-        ]);
-
         // Update last interaction timestamp
-        $profile = $this->getOrCreateProfile($contact);
-        $profile->update(['last_interaction_at' => now()]);
+        $profile = CustomerProfile::where('tenant_id', $this->tenantId)
+            ->where('contact_id', $contact->id)
+            ->first();
+            
+        if ($profile) {
+            $profile->update(['last_interaction_at' => now()]);
+        }
     }
 
     /**
