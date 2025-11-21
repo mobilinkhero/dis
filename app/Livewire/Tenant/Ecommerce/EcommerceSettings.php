@@ -480,22 +480,22 @@ class EcommerceSettings extends Component
 
             $tenantId = tenant_id();
             $previousProductCount = \App\Models\Tenant\Product::where('tenant_id', $tenantId)->count();
+            $configId = $this->config->id;
 
-            EcommerceLogger::info('Google Sheets disconnection initiated', [
+            EcommerceLogger::info('Google Sheets disconnection initiated - DELETING RECORD', [
                 'tenant_id' => $tenantId,
                 'user_id' => auth()->id(),
+                'config_id' => $configId,
                 'previous_url' => $this->config->google_sheets_url,
                 'existing_products' => $previousProductCount
             ]);
 
-            // Clear Google Sheets configuration
-            $this->config->update([
-                'google_sheets_url' => null,
-                'google_sheets_enabled' => false,
-                'products_sheet_id' => null,
-                'orders_sheet_id' => null,
-                'customers_sheet_id' => null,
-                'last_sync_at' => null,
+            // Delete the entire ecommerce configuration record
+            $this->config->delete();
+
+            EcommerceLogger::info('E-commerce configuration record DELETED', [
+                'tenant_id' => $tenantId,
+                'config_id' => $configId
             ]);
 
             // Clear dynamic mapper configuration
@@ -503,27 +503,58 @@ class EcommerceSettings extends Component
                 ->where('sheet_type', 'products')
                 ->delete();
 
-            EcommerceLogger::info('Dynamic mapper configuration cleared', [
+            EcommerceLogger::info('Dynamic mapper configuration DELETED', [
                 'tenant_id' => $tenantId
             ]);
 
-            // Update local settings
-            $this->settings['google_sheets_url'] = '';
-            $this->settings['google_sheets_enabled'] = false;
+            // Clear products if any
+            $deletedProducts = \App\Models\Tenant\Product::where('tenant_id', $tenantId)->delete();
 
-            EcommerceLogger::info('Google Sheets disconnected successfully', [
+            EcommerceLogger::info('Products DELETED', [
+                'tenant_id' => $tenantId,
+                'deleted_count' => $deletedProducts
+            ]);
+
+            // Clear local config reference
+            $this->config = null;
+            
+            // Reset settings
+            $this->settings = [
+                'google_sheets_url' => '',
+                'google_sheets_enabled' => false,
+                'currency' => 'USD',
+                'tax_rate' => '0.00',
+                'collect_customer_details' => true,
+                'required_customer_fields' => [
+                    'name' => true,
+                    'phone' => true,
+                    'address' => true,
+                    'city' => false,
+                    'email' => false,
+                    'notes' => false
+                ],
+                'enabled_payment_methods' => [
+                    'cod' => true,
+                    'bank_transfer' => true,
+                    'card' => false,
+                    'online' => false
+                ],
+            ];
+
+            EcommerceLogger::info('Complete e-commerce teardown successful', [
                 'tenant_id' => $tenantId,
                 'user_id' => auth()->id(),
-                'products_retained' => $previousProductCount
+                'config_deleted' => true,
+                'products_deleted' => $deletedProducts
             ]);
 
             $this->notify([
                 'type' => 'success', 
-                'message' => "Google Sheets disconnected successfully! ({$previousProductCount} products retained. Use 'Clear Products' on Dashboard to remove them.)"
+                'message' => "✅ Complete disconnect successful! Deleted configuration record and {$deletedProducts} products. You can now set up e-commerce again from scratch."
             ]);
 
-            // Refresh the component
-            $this->loadSettings();
+            // Redirect to setup page
+            return redirect()->to(tenant_route('tenant.ecommerce.setup'));
 
         } catch (\Exception $e) {
             EcommerceLogger::error('Google Sheets disconnection failed', [
@@ -535,7 +566,7 @@ class EcommerceSettings extends Component
 
             $this->notify([
                 'type' => 'danger', 
-                'message' => 'Failed to disconnect Google Sheets: ' . $e->getMessage()
+                'message' => 'Failed to disconnect: ' . $e->getMessage()
             ]);
         }
     }
