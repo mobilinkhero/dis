@@ -514,6 +514,13 @@ class GoogleSheetsService
                     'message' => $errorMessage
                 ];
             }
+
+            $data = $response->json();
+            $rows = $data['values'] ?? [];
+
+            if (empty($rows)) {
+                return [
+                    'success' => false,
                     'message' => 'No data found in the Products sheet. Please add products to the sheet first.'
                 ];
             }
