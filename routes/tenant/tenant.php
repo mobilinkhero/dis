@@ -117,6 +117,9 @@ Route::middleware(['auth', TenantMiddleware::class, CheckTenantDeleted::class, E
             Route::get('ai-prompt', ManageAiPrompt::class)->name('ai-prompt');
             Route::get('canned-reply', ManageCannedReply::class)->name('canned-reply');
 
+            // Personal Assistant
+            Route::get('/ai-assistant', \App\Livewire\Tenant\AI\PersonalAssistantManager::class)->name('ai-assistant');
+
             // Staff & Profile
             Route::get('/staff', StaffList::class)->name('staff.list');
             Route::get('/staff/member/{staffId?}', StaffCreator::class)->name('staff.save');

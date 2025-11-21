@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Exceptions\WhatsAppException;
+use App\Models\PersonalAssistant;
 use LLPhant\Chat\OpenAIChat;
 use LLPhant\OpenAIConfig;
 use OpenAI;
@@ -129,5 +130,117 @@ trait Ai
     public function getOpenAiKey()
     {
         return get_tenant_setting_from_db('whats-mark', 'openai_secret_key');
+    }
+
+    /**
+     * Send message to personal assistant with context
+     *
+     * @param string $message User message
+     * @param array $conversationHistory Previous messages for context
+     * @return array Contains status and response
+     */
+    public function personalAssistantResponse(string $message, array $conversationHistory = []): array
+    {
+        try {
+            $assistant = PersonalAssistant::getForCurrentTenant();
+            
+            if (!$assistant) {
+                return [
+                    'status' => false,
+                    'message' => 'No personal assistant configured for this tenant.',
+                ];
+            }
+
+            if (!$assistant->is_active) {
+                return [
+                    'status' => false,
+                    'message' => 'Personal assistant is currently disabled.',
+                ];
+            }
+
+            $config = new OpenAIConfig;
+            $config->apiKey = $this->getOpenAiKey();
+            $config->model = $assistant->model;
+
+            $chat = new OpenAIChat($config);
+            
+            // Build message array with system context
+            $messages = [];
+            
+            // Add system instructions with knowledge base
+            $systemContext = $assistant->getFullSystemContext();
+            $messages[] = ['role' => 'system', 'content' => $systemContext];
+            
+            // Add conversation history if provided
+            foreach ($conversationHistory as $historyMessage) {
+                if (isset($historyMessage['role']) && isset($historyMessage['content'])) {
+                    $messages[] = [
+                        'role' => $historyMessage['role'], 
+                        'content' => $historyMessage['content']
+                    ];
+                }
+            }
+            
+            // Add current user message
+            $messages[] = ['role' => 'user', 'content' => $message];
+
+            // Configure chat parameters
+            $config->temperature = $assistant->temperature;
+            $config->maxTokens = $assistant->max_tokens;
+
+            // Generate response
+            $response = $chat->generateChat($messages);
+
+            return [
+                'status' => true,
+                'message' => $response,
+                'assistant_name' => $assistant->name,
+                'model_used' => $assistant->model,
+                'tokens_used' => $assistant->max_tokens, // Approximate
+            ];
+
+        } catch (\Throwable $th) {
+            whatsapp_log('Personal Assistant Error', 'error', [
+                'error' => $th->getMessage(),
+                'message' => $message,
+            ], $th);
+
+            return [
+                'status' => false,
+                'message' => 'Assistant temporarily unavailable: ' . $th->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Get personal assistant info for current tenant
+     */
+    public function getPersonalAssistantInfo(): ?array
+    {
+        $assistant = PersonalAssistant::getForCurrentTenant();
+        
+        if (!$assistant) {
+            return null;
+        }
+
+        return [
+            'id' => $assistant->id,
+            'name' => $assistant->name,
+            'description' => $assistant->description,
+            'model' => $assistant->model,
+            'is_active' => $assistant->is_active,
+            'has_files' => $assistant->hasUploadedFiles(),
+            'file_count' => $assistant->getFileCount(),
+            'use_cases' => $assistant->getUseCaseBadges(),
+        ];
+    }
+
+    /**
+     * Check if personal assistant is available and configured
+     */
+    public function hasPersonalAssistant(): bool
+    {
+        $assistant = PersonalAssistant::getForCurrentTenant();
+        return $assistant && $assistant->is_active;
     }
 }

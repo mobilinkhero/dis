@@ -10,22 +10,81 @@
     >
       <template #content>
         <div class="space-y-4">
-          <!-- AI Model Selection -->
+          <!-- Assistant Mode Selection -->
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              AI Model
+              Assistant Mode
             </label>
             <select
-              v-model="nodeData.aiModel"
+              v-model="nodeData.assistantMode"
               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
               @change="updateNodeData"
             >
-              <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-              <option value="gpt-3.5-turbo-16k">GPT-3.5 Turbo (16k)</option>
-              <option value="gpt-4">GPT-4</option>
-              <option value="gpt-4-turbo">GPT-4 Turbo</option>
-              <option value="gpt-4o-mini">GPT-4o Mini</option>
+              <option value="personal">Use Personal Assistant</option>
+              <option value="custom">Custom AI Settings</option>
             </select>
+          </div>
+
+          <!-- Personal Assistant Info (when using personal assistant) -->
+          <div v-if="nodeData.assistantMode === 'personal'" class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+            <div v-if="personalAssistant" class="space-y-2">
+              <div class="flex items-center space-x-2">
+                <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span class="font-medium text-blue-800 dark:text-blue-200">{{ personalAssistant.name }}</span>
+              </div>
+              <p class="text-sm text-blue-700 dark:text-blue-300">{{ personalAssistant.description || 'No description' }}</p>
+              <div class="flex flex-wrap gap-1 mt-2">
+                <span v-for="useCase in personalAssistant.use_cases" :key="useCase" 
+                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200">
+                  {{ useCase }}
+                </span>
+              </div>
+              <p class="text-xs text-blue-600 dark:text-blue-400">
+                Model: {{ personalAssistant.model }} • {{ personalAssistant.file_count }} files loaded
+              </p>
+            </div>
+            <div v-else class="text-sm text-yellow-800 dark:text-yellow-200">
+              <p class="font-medium">No Personal Assistant Configured</p>
+              <p class="text-xs mt-1">Create a personal assistant in AI settings to use this mode.</p>
+            </div>
+          </div>
+
+          <!-- Custom AI Settings (when using custom mode) -->
+          <div v-if="nodeData.assistantMode === 'custom'" class="space-y-3">
+            <!-- AI Model Selection -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                AI Model
+              </label>
+              <select
+                v-model="nodeData.aiModel"
+                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                @change="updateNodeData"
+              >
+                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                <option value="gpt-3.5-turbo-16k">GPT-3.5 Turbo (16k)</option>
+                <option value="gpt-4">GPT-4</option>
+                <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                <option value="gpt-4o-mini">GPT-4o Mini</option>
+              </select>
+            </div>
+
+            <!-- System Prompt -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                System Prompt
+              </label>
+              <textarea
+                v-model="nodeData.prompt"
+                rows="4"
+                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white resize-none"
+                placeholder="You are a helpful customer service assistant. Respond professionally and helpfully to customer inquiries..."
+                @input="updateNodeData"
+              />
+              <p class="text-xs text-gray-500 mt-1">
+                Define how the AI should behave and respond. Use variables like {{contact_name}}, {{contact_phone}}, etc.
+              </p>
+            </div>
           </div>
 
           <!-- Context Type -->
@@ -167,11 +226,19 @@ const aiEnabled = computed(() => {
 
 // Initialize node data with default structure
 const nodeData = reactive({
+  assistantMode: props.data?.assistantMode || 'personal',
   aiModel: props.data?.aiModel || 'gpt-3.5-turbo',
   contextType: props.data?.contextType || 'message',
   prompt: props.data?.prompt || 'You are a helpful customer service assistant. Respond professionally and helpfully to customer inquiries. Keep responses concise and relevant.',
   temperature: props.data?.temperature || 0.7,
   maxTokens: props.data?.maxTokens || 500,
+})
+
+// Personal assistant data (would be loaded from API in real implementation)
+const personalAssistant = computed(() => {
+  // In a real implementation, this would come from an API call or store
+  // For now, we'll check if window has the data
+  return window.personalAssistantData || null
 })
 
 // Update node data when changes occur
@@ -186,6 +253,7 @@ const updateNodeData = () => {
 watch(() => props.data, (newData) => {
   if (newData) {
     Object.assign(nodeData, {
+      assistantMode: newData.assistantMode || 'personal',
       aiModel: newData.aiModel || 'gpt-3.5-turbo',
       contextType: newData.contextType || 'message',
       prompt: newData.prompt || nodeData.prompt,
