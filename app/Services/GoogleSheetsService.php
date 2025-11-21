@@ -24,7 +24,7 @@ class GoogleSheetsService
 
     public function __construct(?int $tenantId = null)
     {
-        $this->tenantId = $tenantId ?? tenancy()->tenant?->id;
+        $this->tenantId = $tenantId ?? tenant_id();
         $this->config = EcommerceConfiguration::where('tenant_id', $this->tenantId)->first();
         $this->dynamicMapper = new DynamicSheetMapperService($this->tenantId, 'products');
     }
