@@ -76,6 +76,28 @@ class CustomerProfileService
     }
 
     /**
+     * Determine initial tier for new customer
+     */
+    protected function determineInitialTier($contact): string
+    {
+        // Start all new customers at standard tier
+        return 'standard';
+    }
+
+    /**
+     * Predict initial preferences based on contact data
+     */
+    protected function predictInitialPreferences($contact): array
+    {
+        return [
+            'communication_style' => 'friendly',
+            'detail_level' => 'moderate',
+            'response_speed' => 'normal',
+            'preferred_contact_method' => 'whatsapp'
+        ];
+    }
+
+    /**
      * Update profile metrics based on recent activity
      */
     protected function updateProfileMetrics(CustomerProfile $profile): CustomerProfile
