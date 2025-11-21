@@ -54,8 +54,8 @@ class AiChatTester extends Component
                 'lastname' => 'Customer',
                 'email' => 'test@example.com',
                 'type' => 'lead',
-                'status_id' => get_tenant_setting('lead_status', 1),
-                'source_id' => get_tenant_setting('lead_source', 1),
+                'status_id' => get_tenant_setting_by_tenant_id('whats-mark', 'lead_status', 1, tenant_id()),
+                'source_id' => get_tenant_setting_by_tenant_id('whats-mark', 'lead_source', 1, tenant_id()),
                 'addedfrom' => '0',
             ]
         );
