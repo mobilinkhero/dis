@@ -245,6 +245,17 @@ return [
                     'active_routes' => ['tenant.templatebot.*'],
                     'feature_required' => 'template_bots',
                 ],
+                'ai_assistant' => [
+                    'type' => 'item',
+                    'label' => 'ai_assistant',
+                    'route' => 'tenant.ai-assistant',
+                    'icon' => 'heroicon-o-cpu-chip',
+                    'permission' => null,
+                    'order' => 5,
+                    'active_routes' => ['tenant.ai-assistant'],
+                    'badge' => null,
+                    'external' => false,
+                ],
             ],
         ],
 
