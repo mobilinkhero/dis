@@ -21,6 +21,8 @@ class EcommerceSettings extends Component
     public $importData = [];
     public $serviceAccountStatus = [];
     public $settings = [
+        'google_sheets_url' => '',
+        'google_sheets_enabled' => false,
         'currency' => 'USD',
         'tax_rate' => '0.00',
         'collect_customer_details' => true,
@@ -97,6 +99,7 @@ class EcommerceSettings extends Component
     ];
 
     protected $rules = [
+        'settings.google_sheets_url' => 'nullable|url',
         'settings.currency' => 'required|string|in:USD,EUR,GBP,INR,JPY,AUD,CAD',
         'settings.tax_rate' => 'required|numeric|min:0|max:100',
         'settings.collect_customer_details' => 'nullable|boolean',
@@ -152,6 +155,8 @@ class EcommerceSettings extends Component
         
         if ($this->config) {
             $this->settings = [
+                'google_sheets_url' => $this->config->google_sheets_url ?? '',
+                'google_sheets_enabled' => $this->config->google_sheets_enabled ?? false,
                 'currency' => $this->config->currency ?? 'USD',
                 'tax_rate' => number_format($this->config->tax_rate ?? 0, 2),
                 'collect_customer_details' => $this->config->collect_customer_details ?? true,
@@ -298,6 +303,8 @@ class EcommerceSettings extends Component
             ]);
 
             $this->config->update([
+                'google_sheets_url' => $this->settings['google_sheets_url'] ?? null,
+                'google_sheets_enabled' => !empty($this->settings['google_sheets_url']),
                 'currency' => $this->settings['currency'],
                 'tax_rate' => (float) $this->settings['tax_rate'],
                 'collect_customer_details' => $this->settings['collect_customer_details'],
@@ -345,6 +352,8 @@ class EcommerceSettings extends Component
     public function resetToDefaults()
     {
         $this->settings = [
+            'google_sheets_url' => '',
+            'google_sheets_enabled' => false,
             'currency' => 'USD',
             'tax_rate' => '0.00',
             'payment_methods' => ['cash_on_delivery'],
