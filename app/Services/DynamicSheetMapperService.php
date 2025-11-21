@@ -132,67 +132,79 @@ class DynamicSheetMapperService
                 'row_data' => $rowData
             ]);
             
-            $mapping = $this->configuration->column_mapping ?? [];
-            
-            if (empty($mapping)) {
-                throw new \Exception('No column mapping found. Please run sync to detect columns first.');
+            // Store ALL sheet data in meta_data
+            $allSheetData = [];
+            foreach ($rowData as $header => $value) {
+                // Clean header name for key
+                $cleanKey = str_replace([' ', '-'], '_', strtolower(trim($header)));
+                $allSheetData[$cleanKey] = $value;
             }
             
-            EcommerceLogger::info('📋 Using column mapping', [
-                'mapping' => $mapping
-            ]);
-            
-            // Core product data
+            // Core product data - only essentials for database functionality
             $productData = [
                 'tenant_id' => $this->tenantId,
+                'meta_data' => $allSheetData, // Store EVERYTHING here
             ];
 
-            // Map standard fields
-            $standardFields = [
-                'google_sheet_row_id', 'sku', 'name', 'description', 'price', 
-                'sale_price', 'cost_price', 'stock_quantity', 'low_stock_threshold',
-                'category', 'subcategory', 'weight', 'status', 'featured'
-            ];
-
-            foreach ($mapping as $sheetColumn => $dbField) {
-                if (in_array($dbField, $standardFields)) {
-                    $value = $rowData[$sheetColumn] ?? null;
-                    $productData[$dbField] = $this->castValue($dbField, $value);
-                    
-                    EcommerceLogger::info("  ✅ Mapped {$sheetColumn} → {$dbField}", [
-                        'value' => $value,
-                        'casted_value' => $productData[$dbField]
-                    ]);
+            // Only map absolute essentials for searching/filtering
+            // Find name
+            $nameFields = ['title', 'name', 'Title', 'Name', 'Product Name', 'product_name'];
+            foreach ($nameFields as $field) {
+                if (isset($rowData[$field]) && !empty($rowData[$field])) {
+                    $productData['name'] = $rowData[$field];
+                    break;
+                }
+            }
+            
+            // Find SKU
+            $skuFields = ['product_iD', 'product_id', 'SKU', 'sku', 'Code', 'code'];
+            foreach ($skuFields as $field) {
+                if (isset($rowData[$field]) && !empty($rowData[$field])) {
+                    $productData['sku'] = $rowData[$field];
+                    break;
+                }
+            }
+            
+            // Find Price (for sorting/filtering)
+            $priceFields = ['selling_price', 'Selling Price', 'Price', 'price'];
+            foreach ($priceFields as $field) {
+                if (isset($rowData[$field]) && !empty($rowData[$field])) {
+                    $productData['price'] = (float) $rowData[$field];
+                    break;
+                }
+            }
+            
+            // Find Stock
+            $stockFields = ['quantity', 'Quantity', 'Stock', 'stock_quantity'];
+            foreach ($stockFields as $field) {
+                if (isset($rowData[$field]) && !empty($rowData[$field])) {
+                    $productData['stock_quantity'] = (int) $rowData[$field];
+                    break;
+                }
+            }
+            
+            // Find Status
+            $statusFields = ['status', 'Status'];
+            foreach ($statusFields as $field) {
+                if (isset($rowData[$field]) && !empty($rowData[$field])) {
+                    $status = strtolower(trim($rowData[$field]));
+                    $productData['status'] = in_array($status, ['active', 'inactive', 'draft']) ? $status : 'active';
+                    break;
+                }
+            }
+            
+            // Find Tags
+            $tagFields = ['tags', 'Tags'];
+            foreach ($tagFields as $field) {
+                if (isset($rowData[$field]) && !empty($rowData[$field])) {
+                    $productData['tags'] = $this->parseArrayField($rowData[$field]);
+                    break;
                 }
             }
 
-            // Handle special array fields (tags, images)
-            foreach ($mapping as $sheetColumn => $dbField) {
-                if ($dbField === 'tags') {
-                    $tagsValue = $rowData[$sheetColumn] ?? '';
-                    $productData['tags'] = $this->parseArrayField($tagsValue);
-                    EcommerceLogger::info("  📋 Mapped tags", ['value' => $productData['tags']]);
-                }
-                
-                if ($dbField === 'images') {
-                    $imagesValue = $rowData[$sheetColumn] ?? '';
-                    $productData['images'] = $this->parseArrayField($imagesValue);
-                    EcommerceLogger::info("  🖼️ Mapped images", ['value' => $productData['images']]);
-                }
-            }
-
-            // Collect all custom fields into meta_data
-            $customFields = [];
-            foreach ($mapping as $sheetColumn => $dbField) {
-                if (str_starts_with($dbField, 'custom_')) {
-                    $customFields[$dbField] = $rowData[$sheetColumn] ?? null;
-                }
-            }
-
-            if (!empty($customFields)) {
-                $productData['meta_data'] = $customFields;
-                EcommerceLogger::info("  🎨 Custom fields", ['custom_fields' => $customFields]);
-            }
+            EcommerceLogger::info("  📦 Stored complete sheet data in meta_data", [
+                'fields_count' => count($allSheetData)
+            ]);
 
             // Set sync metadata
             $productData['sync_status'] = 'synced';
