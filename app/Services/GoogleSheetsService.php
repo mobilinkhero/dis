@@ -20,13 +20,13 @@ class GoogleSheetsService
 {
     protected $tenantId;
     protected $config;
-    protected $dynamicMapper;
+    protected $tableService;
 
     public function __construct(?int $tenantId = null)
     {
         $this->tenantId = $tenantId ?? tenant_id();
         $this->config = EcommerceConfiguration::where('tenant_id', $this->tenantId)->first();
-        $this->dynamicMapper = new DynamicSheetMapperService($this->tenantId, 'products');
+        $this->tableService = new DynamicTenantTableService();
     }
 
     /**
@@ -514,99 +514,39 @@ class GoogleSheetsService
                     'message' => $errorMessage
                 ];
             }
-
-            $data = $response->json();
-            
-            if (!isset($data['values']) || empty($data['values'])) {
-                return [
-                    'success' => false,
                     'message' => 'No data found in the Products sheet. Please add products to the sheet first.'
                 ];
             }
 
-            $rows = $data['values'];
-            $header = array_shift($rows);
+            $header = array_shift($rows); // First row is header
             
-            // 🔥 DYNAMIC COLUMN DETECTION - Auto-detect and map columns
-            $detectionResult = $this->dynamicMapper->detectAndMapColumns($header);
+            EcommerceLogger::info('📋 Creating dynamic tenant table', [
+                'tenant_id' => $this->tenantId,
+                'headers' => $header,
+                'total_columns' => count($header)
+            ]);
             
-            if (!$detectionResult['success']) {
+            // Create tenant-specific table with columns matching sheet
+            $tableCreated = $this->tableService->createTenantProductsTable($this->tenantId, $header);
+            
+            if (!$tableCreated) {
                 return [
                     'success' => false,
-                    'message' => 'Failed to detect column structure: ' . ($detectionResult['message'] ?? 'Unknown error')
+                    'message' => 'Failed to create tenant products table'
                 ];
             }
             
-            EcommerceLogger::info('🎯 DYNAMIC-SYNC: Processing sheet data with Service Account and dynamic mapping', [
-                'headers' => $header,
-                'row_count' => count($rows),
-                'mapped_columns' => $detectionResult['column_mapping'],
-                'custom_fields' => $detectionResult['custom_fields']
+            EcommerceLogger::info('✅ Tenant table created with dynamic columns', [
+                'tenant_id' => $this->tenantId,
+                'table_name' => "tenant_{$this->tenantId}_products",
+                'columns' => count($header)
             ]);
             
-            $syncedCount = 0;
-            $errorCount = 0;
-
-            foreach ($rows as $rowIndex => $row) {
-                if (empty($row) || empty($row[0])) continue; // Skip empty rows
-                
-                try {
-                    // Pad row to match header length
-                    $row = array_pad($row, count($header), '');
-                    
-                    EcommerceLogger::info('🔄 Processing row', [
-                        'row_index' => $rowIndex,
-                        'row_data' => $row,
-                        'header' => $header
-                    ]);
-                    
-                    // Use dynamic mapper to transform row data
-                    $productData = $this->dynamicMapper->mapRowToProduct($row, $header);
-                    
-                    EcommerceLogger::info('✅ Mapped product data', [
-                        'row_index' => $rowIndex,
-                        'product_data' => $productData
-                    ]);
-                    
-                    // Validate required fields
-                    if (empty($productData['name']) || empty($productData['sku'])) {
-                        throw new \Exception('Missing required fields: name or sku. Name: ' . ($productData['name'] ?? 'empty') . ', SKU: ' . ($productData['sku'] ?? 'empty'));
-                    }
-                    
-                    // Upsert product
-                    $product = Product::updateOrCreate(
-                        [
-                            'tenant_id' => $this->tenantId,
-                            'sku' => $productData['sku']
-                        ],
-                        $productData
-                    );
-                    
-                    EcommerceLogger::info('💾 Product saved', [
-                        'row_index' => $rowIndex,
-                        'product_id' => $product->id,
-                        'sku' => $product->sku,
-                        'name' => $product->name
-                    ]);
-                    
-                    $syncedCount++;
-                } catch (\Exception $e) {
-                    EcommerceLogger::error('❌ Product sync error', [
-                        'row_index' => $rowIndex,
-                        'row_data' => $row,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
-                    ]);
-                    
-                    // Also log to console for immediate debugging
-                    \Log::error("Row {$rowIndex} sync failed: " . $e->getMessage(), [
-                        'row' => $row,
-                        'trace' => $e->getTraceAsString()
-                    ]);
-                    
-                    $errorCount++;
-                }
-            }
+            // Insert all products into tenant table
+            $result = $this->tableService->insertProducts($this->tenantId, $header, $rows);
+            
+            $syncedCount = $result['inserted'] ?? 0;
+            $errorCount = $result['errors'] ?? 0;
 
             // Update sync status
             $this->config->update([

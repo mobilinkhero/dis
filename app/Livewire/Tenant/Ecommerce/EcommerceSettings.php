@@ -479,16 +479,25 @@ class EcommerceSettings extends Component
             }
 
             $tenantId = tenant_id();
-            $previousProductCount = \App\Models\Tenant\Product::where('tenant_id', $tenantId)->count();
             $configId = $this->config->id;
 
-            EcommerceLogger::info('Google Sheets disconnection initiated - DELETING RECORD', [
+            EcommerceLogger::info('Google Sheets disconnection initiated - DROPPING TABLE', [
                 'tenant_id' => $tenantId,
                 'user_id' => auth()->id(),
                 'config_id' => $configId,
-                'previous_url' => $this->config->google_sheets_url,
-                'existing_products' => $previousProductCount
+                'previous_url' => $this->config->google_sheets_url
             ]);
+
+            // Drop tenant-specific products table
+            $tableService = new \App\Services\DynamicTenantTableService();
+            $tableDropped = $tableService->dropTenantProductsTable($tenantId);
+
+            if ($tableDropped) {
+                EcommerceLogger::info('Tenant products table DROPPED', [
+                    'tenant_id' => $tenantId,
+                    'table_name' => "tenant_{$tenantId}_products"
+                ]);
+            }
 
             // Delete the entire ecommerce configuration record
             $this->config->delete();
@@ -503,16 +512,8 @@ class EcommerceSettings extends Component
                 ->where('sheet_type', 'products')
                 ->delete();
 
-            EcommerceLogger::info('Dynamic mapper configuration DELETED', [
+            EcommerceLogger::info('Sheet configuration DELETED', [
                 'tenant_id' => $tenantId
-            ]);
-
-            // Clear products if any
-            $deletedProducts = \App\Models\Tenant\Product::where('tenant_id', $tenantId)->delete();
-
-            EcommerceLogger::info('Products DELETED', [
-                'tenant_id' => $tenantId,
-                'deleted_count' => $deletedProducts
             ]);
 
             // Clear local config reference
@@ -545,12 +546,12 @@ class EcommerceSettings extends Component
                 'tenant_id' => $tenantId,
                 'user_id' => auth()->id(),
                 'config_deleted' => true,
-                'products_deleted' => $deletedProducts
+                'table_dropped' => $tableDropped
             ]);
 
             $this->notify([
                 'type' => 'success', 
-                'message' => "✅ Complete disconnect successful! Deleted configuration record and {$deletedProducts} products. You can now set up e-commerce again from scratch."
+                'message' => "✅ Complete disconnect! Table dropped, configuration deleted. Ready for new setup."
             ]);
 
             // Redirect to setup page
