@@ -3,10 +3,12 @@
 namespace App\Livewire\Tenant\Ecommerce;
 
 use App\Models\Tenant\EcommerceConfiguration;
-use App\Models\Tenant\Product;
 use App\Models\Tenant\Order;
+use App\Models\Tenant\Product;
 use App\Services\GoogleSheetsService;
-use App\Services\EcommerceLogger;
+use App\Services\Loggers\EcommerceLogger;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class EcommerceDashboard extends Component
@@ -37,11 +39,32 @@ class EcommerceDashboard extends Component
     {
         $tenantId = tenant_id();
         
+        // Check if tenant table exists
+        $tableService = new \App\Services\DynamicTenantTableService();
+        $tableName = $tableService->getTenantTableName($tenantId);
+        
+        if (Schema::hasTable($tableName)) {
+            // Use dynamic tenant table
+            $totalProducts = DB::table($tableName)->count();
+            
+            // Try to count active products if status column exists
+            $activeProducts = 0;
+            if (Schema::hasColumn($tableName, 'status')) {
+                $activeProducts = DB::table($tableName)->where('status', 'Active')->count();
+            }
+            
+            $lowStockProducts = 0; // Not relevant for dynamic tables
+        } else {
+            // Fallback to 0 if table doesn't exist
+            $totalProducts = 0;
+            $activeProducts = 0;
+            $lowStockProducts = 0;
+        }
+        
         $this->stats = [
-            'total_products' => Product::where('tenant_id', $tenantId)->count(),
-            'active_products' => Product::where('tenant_id', $tenantId)->where('status', 'active')->count(),
-            'low_stock_products' => Product::where('tenant_id', $tenantId)
-                ->whereRaw('stock_quantity <= low_stock_threshold')->count(),
+            'total_products' => $totalProducts,
+            'active_products' => $activeProducts,
+            'low_stock_products' => $lowStockProducts,
             
             'total_orders' => Order::where('tenant_id', $tenantId)->count(),
             'pending_orders' => Order::where('tenant_id', $tenantId)->where('status', 'pending')->count(),
@@ -109,7 +132,15 @@ class EcommerceDashboard extends Component
     {
         try {
             $tenantId = tenant_id();
-            $productCount = Product::where('tenant_id', $tenantId)->count();
+            
+            // Use dynamic table service
+            $tableService = new \App\Services\DynamicTenantTableService();
+            $tableName = $tableService->getTenantTableName($tenantId);
+            
+            $productCount = 0;
+            if (Schema::hasTable($tableName)) {
+                $productCount = DB::table($tableName)->count();
+            }
 
             if ($productCount === 0) {
                 $this->notify([
@@ -122,25 +153,26 @@ class EcommerceDashboard extends Component
             EcommerceLogger::info('Product clear initiated from dashboard', [
                 'tenant_id' => $tenantId,
                 'user_id' => auth()->id(),
-                'product_count' => $productCount
+                'product_count' => $productCount,
+                'table_name' => $tableName
             ]);
 
-            // Delete all products for this tenant
-            $deletedCount = Product::where('tenant_id', $tenantId)->delete();
+            // Drop the tenant table
+            $tableService->dropTenantProductsTable($tenantId);
 
             // Also clear dynamic mapper configuration
             \App\Models\Tenant\TenantSheetConfiguration::where('tenant_id', $tenantId)
                 ->where('sheet_type', 'products')
                 ->delete();
 
-            EcommerceLogger::info('Products cleared successfully from dashboard', [
+            EcommerceLogger::info('Products table dropped successfully', [
                 'tenant_id' => $tenantId,
-                'deleted_count' => $deletedCount
+                'deleted_count' => $productCount
             ]);
 
             $this->notify([
                 'type' => 'success',
-                'message' => "Successfully cleared {$deletedCount} products. Sync again to get products from your new sheet."
+                'message' => "Successfully cleared {$productCount} products. Sync again to get products from your new sheet."
             ]);
 
             $this->loadStats(); // Refresh stats to show 0 products
