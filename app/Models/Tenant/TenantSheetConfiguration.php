@@ -53,9 +53,9 @@ class TenantSheetConfiguration extends Model
         return [
             // Core fields (required for basic functionality)
             'core_fields' => [
-                'name' => ['Name', 'Product Name', 'Title', 'Product'],
-                'price' => ['Price', 'Product Price', 'Cost', 'Amount'],
-                'sku' => ['SKU', 'Product Code', 'Code', 'Item Code'],
+                'name' => ['Name', 'Product Name', 'Title', 'Product', 'title'],
+                'price' => ['Price', 'Product Price', 'Cost', 'Amount', 'Selling Price', 'selling_price'],
+                'sku' => ['SKU', 'Product Code', 'Code', 'Item Code', 'product_iD', 'Product ID'],
             ],
             
             // Optional standard fields

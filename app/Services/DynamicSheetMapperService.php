@@ -217,6 +217,14 @@ class DynamicSheetMapperService
                     'product_name' => $productData['name']
                 ]);
             }
+            
+            // Ensure status is NEVER null
+            if (!isset($productData['status']) || $productData['status'] === null || $productData['status'] === '') {
+                $productData['status'] = 'active';
+                EcommerceLogger::info('ℹ️ Status was empty, defaulted to active', [
+                    'product_name' => $productData['name']
+                ]);
+            }
 
             EcommerceLogger::info('✅ Final mapped product data', [
                 'product_data' => $productData
@@ -260,9 +268,12 @@ class DynamicSheetMapperService
             return in_array(strtolower($value), ['yes', 'true', '1', 'on']);
         }
 
-        // Status field
+        // Status field - NEVER return null, always have a default
         if ($field === 'status') {
-            $status = strtolower($value);
+            if (empty($value)) {
+                return 'active'; // Default to active if empty
+            }
+            $status = strtolower(trim($value));
             return in_array($status, ['active', 'inactive', 'draft']) ? $status : 'active';
         }
 
