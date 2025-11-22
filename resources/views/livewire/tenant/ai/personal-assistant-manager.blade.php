@@ -172,7 +172,7 @@
 
         <!-- Action Buttons -->
         <div class="flex items-center space-x-3 mt-6">
-            <button class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center">
+            <button wire:click="openChat({{ $assistant->id }})" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center">
                 <x-heroicon-s-chat-bubble-left-right class="w-4 h-4 mr-2" />
                 Chat
             </button>
@@ -360,5 +360,163 @@
             </form>
         </div>
     </div>
+    @endif
+
+    <!-- Chat Modal -->
+    @if($showChatModal && $chattingAssistantId)
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity z-50" wire:click="closeChat"></div>
+    <div class="fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl" wire:click.stop>
+                @php
+                    $chattingAssistant = $assistants->find($chattingAssistantId);
+                @endphp
+                
+                <!-- Chat Header -->
+                <div class="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                                <x-heroicon-s-sparkles class="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-white">{{ $chattingAssistant->name ?? 'SmartFlow AI' }}</h3>
+                                <p class="text-xs text-white/80">{{ $availableModels[$chattingAssistant->model] ?? 'gpt-3.5-turbo' }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs text-white bg-white/20 px-2 py-1 rounded">
+                                {{ $chattingAssistant->hasUploadedFiles() ? $chattingAssistant->getFileCount() : 1 }} Documents
+                            </span>
+                            <button wire:click="closeChat" class="text-white/80 hover:text-white">
+                                <x-heroicon-s-x-mark class="w-6 h-6" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Knowledge Base Sidebar (Optional - shown on right) -->
+                <div class="flex">
+                    <!-- Chat Messages Area -->
+                    <div class="flex-1">
+                        <div class="h-96 overflow-y-auto p-4 space-y-4" id="chat-messages">
+                            @foreach($chatMessages as $message)
+                            <div class="flex {{ $message['role'] === 'user' ? 'justify-end' : 'justify-start' }}">
+                                <div class="flex items-start space-x-2 max-w-md">
+                                    @if($message['role'] === 'assistant')
+                                    <div class="flex-shrink-0">
+                                        <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                                            <x-heroicon-s-sparkles class="w-5 h-5 text-purple-600" />
+                                        </div>
+                                    </div>
+                                    @endif
+                                    
+                                    <div class="{{ $message['role'] === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white' }} rounded-lg px-4 py-2">
+                                        @if($message['content'] === 'typing')
+                                        <div class="flex space-x-1">
+                                            <div class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+                                            <div class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+                                            <div class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+                                        </div>
+                                        @else
+                                        <p class="text-sm">{{ $message['content'] }}</p>
+                                        @endif
+                                        <p class="text-xs {{ $message['role'] === 'user' ? 'text-blue-100' : 'text-gray-500' }} mt-1">{{ $message['timestamp'] }}</p>
+                                    </div>
+                                    
+                                    @if($message['role'] === 'user')
+                                    <div class="flex-shrink-0">
+                                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                            <x-heroicon-s-user class="w-5 h-5 text-blue-600" />
+                                        </div>
+                                    </div>
+                                    @endif
+                                </div>
+                            </div>
+                            @endforeach
+                        </div>
+
+                        <!-- Message Input -->
+                        <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-3">
+                            <form wire:submit.prevent="sendMessage" class="flex items-center space-x-2">
+                                <input 
+                                    type="text" 
+                                    wire:model="currentMessage"
+                                    placeholder="Type your message..."
+                                    class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-blue-500 focus:ring-blue-500"
+                                    autofocus
+                                >
+                                <button 
+                                    type="submit"
+                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                                >
+                                    <x-heroicon-s-paper-airplane class="w-5 h-5" />
+                                    <span class="ml-2">Send</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Knowledge Base Panel -->
+                    <div class="w-64 border-l border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-900">
+                        <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center">
+                            <x-heroicon-s-document-text class="w-4 h-4 mr-2" />
+                            Knowledge Base
+                        </h4>
+                        
+                        @if($chattingAssistant && $chattingAssistant->hasUploadedFiles())
+                        <div class="space-y-2">
+                            @foreach($chattingAssistant->getFilesWithStatus() as $file)
+                            <div class="bg-white dark:bg-gray-800 rounded-lg p-2">
+                                <div class="flex items-center space-x-2">
+                                    <x-heroicon-s-document class="w-4 h-4 text-gray-400" />
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-xs font-medium text-gray-900 dark:text-white truncate">{{ $file['original_name'] }}</p>
+                                        <p class="text-xs text-green-600">Synced</p>
+                                    </div>
+                                </div>
+                            </div>
+                            @endforeach
+                        </div>
+                        @else
+                        <div class="bg-white dark:bg-gray-800 rounded-lg p-2">
+                            <div class="flex items-center space-x-2">
+                                <x-heroicon-s-document class="w-4 h-4 text-gray-400" />
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-medium text-gray-900 dark:text-white">SmartFlow.docx</p>
+                                    <p class="text-xs text-green-600">Synced</p>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="bg-gray-50 dark:bg-gray-900 px-6 py-3 flex justify-between items-center">
+                    <button wire:click="closeChat" class="text-sm text-gray-500 hover:text-gray-700">
+                        Back to assistant
+                    </button>
+                    <button class="text-sm text-red-600 hover:text-red-800">
+                        Clear Chat
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script to auto-scroll chat -->
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('scroll-to-bottom', () => {
+                setTimeout(() => {
+                    const chatMessages = document.getElementById('chat-messages');
+                    if (chatMessages) {
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }, 100);
+            });
+        });
+    </script>
     @endif
 </div>

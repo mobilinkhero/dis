@@ -18,6 +18,10 @@ class PersonalAssistantManager extends Component
     public $showCreateForm = false;
     public $files = [];
     public $editingAssistantId = null;
+    public $showChatModal = false;
+    public $chattingAssistantId = null;
+    public $chatMessages = [];
+    public $currentMessage = '';
     
     // Form fields
     public $name = '';
@@ -337,6 +341,87 @@ class PersonalAssistantManager extends Component
         } catch (\Exception $e) {
             session()->flash('error', 'Failed to sync assistant: ' . $e->getMessage());
         }
+    }
+
+    public function openChat($assistantId)
+    {
+        $assistant = PersonalAssistant::find($assistantId);
+        if (!$assistant) {
+            return;
+        }
+
+        $this->chattingAssistantId = $assistantId;
+        $this->showChatModal = true;
+        $this->chatMessages = [
+            [
+                'role' => 'assistant',
+                'content' => "Hello! How can I assist you today with the files you have uploaded?",
+                'timestamp' => now()->format('h:i A')
+            ]
+        ];
+        $this->currentMessage = '';
+    }
+
+    public function closeChat()
+    {
+        $this->showChatModal = false;
+        $this->chattingAssistantId = null;
+        $this->chatMessages = [];
+        $this->currentMessage = '';
+    }
+
+    public function sendMessage()
+    {
+        if (empty(trim($this->currentMessage))) {
+            return;
+        }
+
+        $assistant = PersonalAssistant::find($this->chattingAssistantId);
+        if (!$assistant) {
+            return;
+        }
+
+        // Add user message
+        $this->chatMessages[] = [
+            'role' => 'user',
+            'content' => $this->currentMessage,
+            'timestamp' => now()->format('h:i A')
+        ];
+
+        $userMessage = $this->currentMessage;
+        $this->currentMessage = '';
+
+        // Simulate AI response (you can integrate with actual AI here)
+        $this->chatMessages[] = [
+            'role' => 'assistant', 
+            'content' => 'typing',
+            'timestamp' => now()->format('h:i A')
+        ];
+
+        // Simulate delay for AI response
+        $this->dispatch('scroll-to-bottom');
+        
+        // In real implementation, you would call the AI service here
+        // For now, we'll simulate a response
+        sleep(1);
+        
+        // Remove typing indicator and add actual response
+        array_pop($this->chatMessages);
+        
+        $responses = [
+            "I can help you with that! What specific issue are you facing?",
+            "Based on the uploaded files, I can assist you with various tasks. What would you like to know?",
+            "I understand your question. Let me help you with that.",
+            "That's a great question! Here's what I found in the knowledge base...",
+        ];
+        
+        $this->chatMessages[] = [
+            'role' => 'assistant',
+            'content' => $responses[array_rand($responses)],
+            'timestamp' => now()->format('h:i A')
+        ];
+
+        $this->dispatch('scroll-to-bottom');
     }
 
     public function updatedUseCaseTags()
