@@ -527,21 +527,34 @@ class PersonalAssistantManager extends Component
 
     private function getAiResponse($messages, $model, $temperature, $maxTokens)
     {
-        // Check if OpenAI is configured
-        $openaiKey = getSetting('openai_api_key');
-        if (!$openaiKey) {
-            throw new \Exception('OpenAI API key not configured');
+        try {
+            // Get OpenAI key using the trait's method
+            $openaiKey = $this->getOpenAiKey();
+            
+            if (!$openaiKey) {
+                throw new \Exception('OpenAI API key not configured. Please add your OpenAI API key in the settings.');
+            }
+
+            // Use LLPhant OpenAI Chat like in the trait
+            $config = new \LLPhant\OpenAIConfig();
+            $config->apiKey = $openaiKey;
+            $config->model = $model;
+            $config->temperature = $temperature;
+            $config->maxTokens = $maxTokens;
+
+            $chat = new \LLPhant\Chat\OpenAIChat($config);
+            
+            // Generate response
+            $response = $chat->generateChat($messages);
+            
+            return $response;
+            
+        } catch (\Exception $e) {
+            Log::error('AI Response Error: ' . $e->getMessage());
+            
+            // Return a fallback message instead of throwing
+            return 'I apologize, but I encountered an error processing your request. Please ensure your OpenAI API key is configured correctly in the settings.';
         }
-
-        // Use the AI trait's chat method
-        $response = $this->chat(
-            messages: $messages,
-            model: $model,
-            temperature: $temperature,
-            max_tokens: $maxTokens
-        );
-
-        return $response['choices'][0]['message']['content'] ?? 'I understand your question. Let me help you with that.';
     }
 
     public function updatedUseCaseTags()
