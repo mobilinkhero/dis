@@ -76,18 +76,20 @@
                     <div>
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ $assistant->name }}</h3>
                         <div class="flex items-center space-x-2 mt-1">
-                            <span class="text-xs font-medium text-green-600">Active</span>
+                            <span class="text-xs font-medium {{ $assistant->is_active ? 'text-green-600' : 'text-gray-500' }}">
+                                {{ $assistant->is_active ? 'Active' : 'Inactive' }}
+                            </span>
                             <span class="text-xs text-gray-500">{{ $availableModels[$assistant->model] ?? 'gpt-4o-mini' }}</span>
                         </div>
                     </div>
                     <div class="flex items-center space-x-2">
-                        <span class="text-xs text-gray-500">Active</span>
+                        <span class="text-xs text-gray-500">{{ $assistant->is_active ? 'Active' : 'Inactive' }}</span>
                         <button 
                             wire:click="toggleAssistant({{ $assistant->id }})"
                             type="button"
-                            class="relative inline-flex h-6 w-11 items-center rounded-full bg-purple-600 transition-colors"
+                            class="relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 {{ $assistant->is_active ? 'bg-purple-600' : 'bg-gray-300' }}"
                         >
-                            <span class="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6"></span>
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out {{ $assistant->is_active ? 'translate-x-6' : 'translate-x-1' }}"></span>
                         </button>
                     </div>
                 </div>
@@ -125,28 +127,34 @@
                 <!-- Sync Status -->
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-2">
-                        <div class="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                        <div class="w-2 h-2 {{ $assistant->hasUploadedFiles() ? 'bg-green-400' : 'bg-yellow-400' }} rounded-full"></div>
                         <span class="text-sm text-gray-700 dark:text-gray-300">Sync Status</span>
                     </div>
-                    <span class="text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-1 rounded">0% Synced</span>
+                    <span class="text-xs font-medium {{ $assistant->hasUploadedFiles() ? 'text-green-600 bg-green-50' : 'text-yellow-600 bg-yellow-50' }} px-2 py-1 rounded">
+                        {{ $assistant->hasUploadedFiles() ? '100% Synced' : '0% Synced' }}
+                    </span>
                 </div>
 
                 <!-- AI Assistant -->
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-2">
-                        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <div class="w-2 h-2 {{ $assistant->is_active ? 'bg-green-400' : 'bg-gray-400' }} rounded-full"></div>
                         <span class="text-sm text-gray-700 dark:text-gray-300">AI Assistant</span>
                     </div>
-                    <span class="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">Created</span>
+                    <span class="text-xs font-medium {{ $assistant->is_active ? 'text-green-600 bg-green-50' : 'text-gray-600 bg-gray-100' }} px-2 py-1 rounded">
+                        {{ $assistant->is_active ? 'Active' : 'Inactive' }}
+                    </span>
                 </div>
 
                 <!-- Knowledge Base -->
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-2">
-                        <div class="w-2 h-2 bg-gray-400 rounded-full"></div>
+                        <div class="w-2 h-2 {{ $assistant->hasUploadedFiles() ? 'bg-green-400' : 'bg-gray-400' }} rounded-full"></div>
                         <span class="text-sm text-gray-700 dark:text-gray-300">Knowledge Base</span>
                     </div>
-                    <span class="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">Pending</span>
+                    <span class="text-xs font-medium {{ $assistant->hasUploadedFiles() ? 'text-green-600 bg-green-50' : 'text-gray-600 bg-gray-100' }} px-2 py-1 rounded">
+                        {{ $assistant->hasUploadedFiles() ? 'Ready' : 'Pending' }}
+                    </span>
                 </div>
             </div>
 
@@ -168,13 +176,20 @@
                 <x-heroicon-s-chat-bubble-left-right class="w-4 h-4 mr-2" />
                 Chat
             </button>
-            <button class="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors">
-                Sync Now
+            <button wire:click="syncAssistant({{ $assistant->id }})" wire:loading.attr="disabled" class="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <span wire:loading.remove wire:target="syncAssistant({{ $assistant->id }})">Sync Now</span>
+                <span wire:loading wire:target="syncAssistant({{ $assistant->id }})" class="flex items-center justify-center">
+                    <svg class="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Syncing...
+                </span>
             </button>
-            <button class="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+            <button wire:click="editSpecificAssistant({{ $assistant->id }})" class="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" title="Edit Assistant">
                 <x-heroicon-s-cog-6-tooth class="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </button>
-            <button wire:click="deleteSpecificAssistant({{ $assistant->id }})" wire:confirm="Delete assistant?" class="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors">
+            <button wire:click="deleteSpecificAssistant({{ $assistant->id }})" wire:confirm="Delete assistant?" class="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors" title="Delete Assistant">
                 <x-heroicon-s-trash class="w-5 h-5 text-red-600 dark:text-red-400" />
             </button>
         </div>

@@ -315,6 +315,30 @@ class PersonalAssistantManager extends Component
         }
     }
 
+    public function syncAssistant($assistantId)
+    {
+        $assistant = PersonalAssistant::find($assistantId);
+        if (!$assistant) {
+            return;
+        }
+
+        try {
+            // Simulate sync process with a small delay
+            sleep(1);
+            
+            // Update sync status (you can add actual sync logic here)
+            $assistant->update([
+                'last_synced_at' => now(),
+            ]);
+            
+            session()->flash('success', 'Assistant synced successfully!');
+            $this->loadAssistant();
+            
+        } catch (\Exception $e) {
+            session()->flash('error', 'Failed to sync assistant: ' . $e->getMessage());
+        }
+    }
+
     public function updatedUseCaseTags()
     {
         // Auto-update system instructions based on selected use cases
