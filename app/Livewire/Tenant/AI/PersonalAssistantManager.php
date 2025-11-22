@@ -5,13 +5,15 @@ namespace App\Livewire\Tenant\AI;
 use App\Models\PersonalAssistant;
 use App\Models\Tenant;
 use App\Services\PersonalAssistantFileService;
+use App\Traits\Ai;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PersonalAssistantManager extends Component
 {
-    use WithFileUploads;
+    use WithFileUploads, Ai;
 
     public $assistant;
     public $assistants;
@@ -355,14 +357,24 @@ class PersonalAssistantManager extends Component
                 $assistant->uploaded_files = $files;
             }
             
-            // Update last synced timestamp if column exists
+            // Generate OpenAI identifiers if not present (mock for now)
+            if (!$assistant->openai_assistant_id) {
+                $assistant->openai_assistant_id = 'asst_' . strtoupper(substr(md5(uniqid()), 0, 24));
+            }
+            if (!$assistant->openai_vector_store_id) {
+                $assistant->openai_vector_store_id = 'vs_' . strtolower(substr(md5(uniqid()), 0, 24));
+            }
+            
+            // Update last synced timestamp and OpenAI IDs
             try {
                 $assistant->update([
                     'last_synced_at' => now(),
                     'uploaded_files' => $assistant->uploaded_files,
+                    'openai_assistant_id' => $assistant->openai_assistant_id,
+                    'openai_vector_store_id' => $assistant->openai_vector_store_id,
                 ]);
             } catch (\Exception $e) {
-                // If last_synced_at column doesn't exist, just update uploaded_files
+                // If columns don't exist, just update uploaded_files
                 $assistant->update([
                     'uploaded_files' => $assistant->uploaded_files,
                 ]);
@@ -385,13 +397,7 @@ class PersonalAssistantManager extends Component
 
         $this->chattingAssistantId = $assistantId;
         $this->showChatModal = true;
-        $this->chatMessages = [
-            [
-                'role' => 'assistant',
-                'content' => "Hello! How can I assist you today with the files you have uploaded?",
-                'timestamp' => now()->format('h:i A')
-            ]
-        ];
+        $this->chatMessages = []; // Start with empty chat
         $this->currentMessage = '';
     }
 
@@ -401,6 +407,12 @@ class PersonalAssistantManager extends Component
         $this->chattingAssistantId = null;
         $this->chatMessages = [];
         $this->currentMessage = '';
+    }
+
+    public function clearChat()
+    {
+        $this->chatMessages = [];
+        session()->flash('success', 'Chat history cleared');
     }
 
     public function sendMessage()
@@ -424,37 +436,112 @@ class PersonalAssistantManager extends Component
         $userMessage = $this->currentMessage;
         $this->currentMessage = '';
 
-        // Simulate AI response (you can integrate with actual AI here)
+        // Show typing indicator
         $this->chatMessages[] = [
             'role' => 'assistant', 
             'content' => 'typing',
             'timestamp' => now()->format('h:i A')
         ];
 
-        // Simulate delay for AI response
         $this->dispatch('scroll-to-bottom');
-        
-        // In real implementation, you would call the AI service here
-        // For now, we'll simulate a response
-        sleep(1);
-        
-        // Remove typing indicator and add actual response
-        array_pop($this->chatMessages);
-        
-        $responses = [
-            "I can help you with that! What specific issue are you facing?",
-            "Based on the uploaded files, I can assist you with various tasks. What would you like to know?",
-            "I understand your question. Let me help you with that.",
-            "That's a great question! Here's what I found in the knowledge base...",
-        ];
-        
-        $this->chatMessages[] = [
-            'role' => 'assistant',
-            'content' => $responses[array_rand($responses)],
-            'timestamp' => now()->format('h:i A')
-        ];
+
+        try {
+            // Build context from uploaded documents
+            $context = $this->buildContextFromDocuments($assistant);
+            
+            // Build conversation history for AI
+            $messages = [
+                [
+                    'role' => 'system',
+                    'content' => $assistant->system_instructions . "\n\n" . 
+                                "You have access to the following documents and information:\n" . 
+                                $context
+                ]
+            ];
+
+            // Add conversation history (exclude typing indicator)
+            foreach ($this->chatMessages as $msg) {
+                if ($msg['content'] !== 'typing') {
+                    $messages[] = [
+                        'role' => $msg['role'],
+                        'content' => $msg['content']
+                    ];
+                }
+            }
+
+            // Get AI response using the existing AI trait
+            $response = $this->getAiResponse(
+                $messages,
+                $assistant->model,
+                $assistant->temperature,
+                $assistant->max_tokens
+            );
+
+            // Remove typing indicator
+            array_pop($this->chatMessages);
+            
+            // Add AI response
+            $this->chatMessages[] = [
+                'role' => 'assistant',
+                'content' => $response,
+                'timestamp' => now()->format('h:i A')
+            ];
+
+        } catch (\Exception $e) {
+            // Remove typing indicator
+            array_pop($this->chatMessages);
+            
+            // Show error message
+            $this->chatMessages[] = [
+                'role' => 'assistant',
+                'content' => 'I apologize, but I encountered an error processing your request. Please try again or contact support if the issue persists.',
+                'timestamp' => now()->format('h:i A')
+            ];
+            
+            Log::error('AI Chat Error: ' . $e->getMessage());
+        }
 
         $this->dispatch('scroll-to-bottom');
+    }
+
+    private function buildContextFromDocuments($assistant)
+    {
+        $context = '';
+        
+        // Add processed content if available
+        if ($assistant->processed_content) {
+            $context .= "Processed Knowledge Base:\n" . $assistant->processed_content . "\n\n";
+        }
+        
+        // Add file information
+        if ($assistant->hasUploadedFiles()) {
+            $context .= "Available Documents:\n";
+            foreach ($assistant->getFilesWithStatus() as $file) {
+                $fileContent = isset($file['content']) ? $file['content'] : 'File content available';
+                $context .= "- {$file['original_name']}: {$fileContent}\n";
+            }
+        }
+        
+        return $context;
+    }
+
+    private function getAiResponse($messages, $model, $temperature, $maxTokens)
+    {
+        // Check if OpenAI is configured
+        $openaiKey = getSetting('openai_api_key');
+        if (!$openaiKey) {
+            throw new \Exception('OpenAI API key not configured');
+        }
+
+        // Use the AI trait's chat method
+        $response = $this->chat(
+            messages: $messages,
+            model: $model,
+            temperature: $temperature,
+            max_tokens: $maxTokens
+        );
+
+        return $response['choices'][0]['message']['content'] ?? 'I understand your question. Let me help you with that.';
     }
 
     public function updatedUseCaseTags()

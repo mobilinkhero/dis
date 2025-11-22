@@ -45,6 +45,8 @@ class PersonalAssistant extends Model
         'is_active',
         'use_case_tags',
         'last_synced_at',
+        'openai_assistant_id',
+        'openai_vector_store_id',
     ];
 
     protected $casts = [

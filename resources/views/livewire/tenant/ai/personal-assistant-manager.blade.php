@@ -450,7 +450,7 @@
                                 <x-heroicon-s-arrow-left class="w-4 h-4 inline mr-1" />
                                 Back to assistant
                             </button>
-                            <button class="px-3 py-1.5 text-sm bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center">
+                            <button wire:click="clearChat" class="px-3 py-1.5 text-sm bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center">
                                 <x-heroicon-s-trash class="w-4 h-4 mr-1" />
                                 Clear Chat
                             </button>
