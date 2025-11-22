@@ -300,12 +300,42 @@
                 <!-- File Upload -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Upload Files for AI Analysis</label>
+                    
+                    <!-- Show existing files if editing -->
+                    @if($editingAssistantId && $assistant && $assistant->hasUploadedFiles())
+                    <div class="mt-2 mb-4 bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Currently Uploaded Files</h4>
+                        <div class="space-y-2">
+                            @foreach($assistant->getFilesWithStatus() as $file)
+                            <div class="flex items-center justify-between bg-white dark:bg-gray-800 rounded p-2">
+                                <div class="flex items-center space-x-2">
+                                    @if($file['type'] === 'csv')
+                                    <x-heroicon-s-table-cells class="h-4 w-4 text-green-500" />
+                                    @elseif(in_array($file['type'], ['txt', 'md']))
+                                    <x-heroicon-s-document-text class="h-4 w-4 text-blue-500" />
+                                    @elseif($file['type'] === 'json')
+                                    <x-heroicon-s-code-bracket class="h-4 w-4 text-purple-500" />
+                                    @else
+                                    <x-heroicon-s-document class="h-4 w-4 text-gray-500" />
+                                    @endif
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">{{ $file['original_name'] }}</span>
+                                    <span class="text-xs text-gray-500">({{ number_format($file['size'] ?? 0) }} bytes)</span>
+                                </div>
+                                <button type="button" wire:click="removeFile('{{ $file['original_name'] }}')" class="text-red-600 hover:text-red-800">
+                                    <x-heroicon-s-x-mark class="h-4 w-4" />
+                                </button>
+                            </div>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+                    
                     <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md dark:border-gray-600">
                         <div class="space-y-1 text-center">
                             <x-heroicon-o-cloud-arrow-up class="mx-auto h-12 w-12 text-gray-400" />
                             <div class="flex text-sm text-gray-600">
                                 <label for="file-upload" class="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500">
-                                    <span>Upload files</span>
+                                    <span>Upload {{ $editingAssistantId ? 'additional' : '' }} files</span>
                                     <input wire:model="files" id="file-upload" name="file-upload" type="file" class="sr-only" multiple accept=".txt,.md,.csv,.json">
                                 </label>
                                 <p class="pl-1">or drag and drop</p>
@@ -318,6 +348,7 @@
                     
                     @if(count($files) > 0)
                     <div class="mt-2 space-y-1">
+                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">New files to upload:</h4>
                         @foreach($files as $file)
                         <div class="text-sm text-gray-600 dark:text-gray-400">
                             📁 {{ $file->getClientOriginalName() }} ({{ number_format($file->getSize()) }} bytes)
@@ -367,10 +398,34 @@
     <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity z-50" wire:click="closeChat"></div>
     <div class="fixed inset-0 z-50 overflow-y-auto">
         <div class="flex min-h-full items-center justify-center p-4">
-            <div class="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl" wire:click.stop>
+            <div class="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl" wire:click.stop>
                 @php
                     $chattingAssistant = $assistants->find($chattingAssistantId);
                 @endphp
+                
+                <!-- Top Bar with Actions -->
+                <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ $chattingAssistant->name ?? 'SmartFlow AI' }}</h3>
+                        <div class="flex items-center space-x-2">
+                            <button class="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600">
+                                <x-heroicon-s-arrow-left class="w-4 h-4 inline mr-1" />
+                                Back to assistant
+                            </button>
+                            <button class="px-3 py-1 text-sm bg-red-100 text-red-600 rounded hover:bg-red-200">
+                                <x-heroicon-s-trash class="w-4 h-4 inline mr-1" />
+                                Clear Chat
+                            </button>
+                            <button class="px-3 py-1 text-sm bg-green-100 text-green-600 rounded hover:bg-green-200">
+                                <x-heroicon-s-arrow-path class="w-4 h-4 inline mr-1" />
+                                Synced
+                            </button>
+                            <button wire:click="closeChat" class="text-gray-400 hover:text-gray-600">
+                                <x-heroicon-s-x-mark class="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 
                 <!-- Chat Header -->
                 <div class="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4">
@@ -388,9 +443,7 @@
                             <span class="text-xs text-white bg-white/20 px-2 py-1 rounded">
                                 {{ $chattingAssistant->hasUploadedFiles() ? $chattingAssistant->getFileCount() : 1 }} Documents
                             </span>
-                            <button wire:click="closeChat" class="text-white/80 hover:text-white">
-                                <x-heroicon-s-x-mark class="w-6 h-6" />
-                            </button>
+                            <span class="text-xs text-white/80">Online</span>
                         </div>
                     </div>
                 </div>
@@ -399,10 +452,10 @@
                 <div class="flex">
                     <!-- Chat Messages Area -->
                     <div class="flex-1">
-                        <div class="h-96 overflow-y-auto p-4 space-y-4" id="chat-messages">
+                        <div class="h-96 overflow-y-auto p-6 space-y-4 bg-gray-50 dark:bg-gray-900" id="chat-messages">
                             @foreach($chatMessages as $message)
                             <div class="flex {{ $message['role'] === 'user' ? 'justify-end' : 'justify-start' }}">
-                                <div class="flex items-start space-x-2 max-w-md">
+                                <div class="flex items-start space-x-3 max-w-2xl">
                                     @if($message['role'] === 'assistant')
                                     <div class="flex-shrink-0">
                                         <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
@@ -411,7 +464,7 @@
                                     </div>
                                     @endif
                                     
-                                    <div class="{{ $message['role'] === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white' }} rounded-lg px-4 py-2">
+                                    <div class="{{ $message['role'] === 'user' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' }} rounded-lg px-4 py-3">
                                         @if($message['content'] === 'typing')
                                         <div class="flex space-x-1">
                                             <div class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
@@ -419,9 +472,9 @@
                                             <div class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
                                         </div>
                                         @else
-                                        <p class="text-sm">{{ $message['content'] }}</p>
+                                        <p class="text-sm leading-relaxed">{{ $message['content'] }}</p>
                                         @endif
-                                        <p class="text-xs {{ $message['role'] === 'user' ? 'text-blue-100' : 'text-gray-500' }} mt-1">{{ $message['timestamp'] }}</p>
+                                        <p class="text-xs {{ $message['role'] === 'user' ? 'text-blue-100' : 'text-gray-400' }} mt-2">{{ $message['timestamp'] }}</p>
                                     </div>
                                     
                                     @if($message['role'] === 'user')
@@ -437,21 +490,21 @@
                         </div>
 
                         <!-- Message Input -->
-                        <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-3">
-                            <form wire:submit.prevent="sendMessage" class="flex items-center space-x-2">
+                        <div class="border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-white dark:bg-gray-800">
+                            <form wire:submit.prevent="sendMessage" class="flex items-center space-x-3">
                                 <input 
                                     type="text" 
                                     wire:model="currentMessage"
                                     placeholder="Type your message..."
-                                    class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-blue-500 focus:ring-blue-500"
+                                    class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-purple-500 focus:ring-purple-500 text-sm"
                                     autofocus
                                 >
                                 <button 
                                     type="submit"
-                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                                    class="bg-purple-600 text-white px-5 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center text-sm font-medium"
                                 >
-                                    <x-heroicon-s-paper-airplane class="w-5 h-5" />
-                                    <span class="ml-2">Send</span>
+                                    <x-heroicon-s-paper-airplane class="w-4 h-4 mr-2" />
+                                    Send
                                 </button>
                             </form>
                         </div>
@@ -492,15 +545,6 @@
                     </div>
                 </div>
 
-                <!-- Action Buttons -->
-                <div class="bg-gray-50 dark:bg-gray-900 px-6 py-3 flex justify-between items-center">
-                    <button wire:click="closeChat" class="text-sm text-gray-500 hover:text-gray-700">
-                        Back to assistant
-                    </button>
-                    <button class="text-sm text-red-600 hover:text-red-800">
-                        Clear Chat
-                    </button>
-                </div>
             </div>
         </div>
     </div>

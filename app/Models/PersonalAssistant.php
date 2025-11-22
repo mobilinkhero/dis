@@ -44,6 +44,7 @@ class PersonalAssistant extends Model
         'processed_content',
         'is_active',
         'use_case_tags',
+        'last_synced_at',
     ];
 
     protected $casts = [

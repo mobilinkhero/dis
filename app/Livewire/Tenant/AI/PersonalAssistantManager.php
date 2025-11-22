@@ -148,8 +148,23 @@ class PersonalAssistantManager extends Component
                 'file_analysis_enabled' => $this->file_analysis_enabled,
             ];
 
-            // Create or update assistant
-            $assistant = PersonalAssistant::createOrUpdateForTenant($data);
+            // Check if we're editing an existing assistant
+            if ($this->editingAssistantId) {
+                $assistant = PersonalAssistant::find($this->editingAssistantId);
+                if ($assistant) {
+                    $assistant->update($data);
+                } else {
+                    throw new \Exception('Assistant not found');
+                }
+            } else {
+                // Create new assistant
+                $tenant = PersonalAssistant::getCurrentTenant();
+                if (!$tenant) {
+                    throw new \Exception('No current tenant found');
+                }
+                $data['tenant_id'] = $tenant->id;
+                $assistant = PersonalAssistant::create($data);
+            }
 
             // Process uploaded files if any
             if (!empty($this->files)) {
@@ -443,6 +458,7 @@ class PersonalAssistantManager extends Component
         $this->use_case_tags = [];
         $this->file_analysis_enabled = true;
         $this->files = [];
+        $this->editingAssistantId = null;
     }
 
     private function getDefaultInstructions(): string
