@@ -60,52 +60,146 @@
     </div>
     @endif
 
-    <!-- Assistant List -->
-    @if($assistant && !$showCreateForm)
-    <div class="mt-6 space-y-4">
-        <!-- AI Assistant Item -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-            <div class="flex items-center justify-between">
-                <!-- Left: Icon and Content -->
-                <div class="flex items-center space-x-3">
-                    <!-- Icon -->
-                    <div class="flex-shrink-0">
-                        <x-heroicon-s-cpu-chip class="w-8 h-8 text-blue-600" />
-                    </div>
-                    
-                    <!-- Content -->
-                    <div>
-                        <div class="flex items-center space-x-2">
-                            <h3 class="text-base font-medium text-gray-900 dark:text-white">
-                                {{ $assistant->name }}
-                            </h3>
-                            <span class="text-sm text-{{ $assistant->is_active ? 'green' : 'red' }}-600 font-medium">
-                                {{ $assistant->is_active ? 'Active' : 'Inactive' }}
-                            </span>
+    <!-- AI Services List -->
+    @if(!$showCreateForm)
+    <div class="mt-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
+            
+            <!-- SmartFlow AI -->
+            <div class="p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-shrink-0">
+                            <x-heroicon-s-sparkles class="w-6 h-6 text-purple-600" />
                         </div>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                            {{ $assistant->description ?: 'AI Intelligent virtual assistant designed to streamline your workflows, provide real-time insights.' }}
-                        </p>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h3 class="text-sm font-medium text-gray-900 dark:text-white">SmartFlow AI</h3>
+                                <span class="text-xs text-blue-600 font-medium">Active</span>
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">AI intelligent virtual assistant designed to streamline your workflows, provide real-time insights.</p>
+                        </div>
                     </div>
-                </div>
-                
-                <!-- Right: Toggle Switch -->
-                <div class="flex items-center space-x-2">
-                    <button wire:click="editAssistant" class="text-gray-400 hover:text-gray-600">
-                        Edit
-                    </button>
-                    <button wire:click="deleteAssistant" wire:confirm="Delete assistant?" class="text-gray-400 hover:text-red-600">
-                        Delete
-                    </button>
-                    <button 
-                        wire:click="toggleAssistant"
-                        type="button"
-                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {{ $assistant->is_active ? 'bg-blue-600' : 'bg-gray-200' }}"
-                    >
-                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {{ $assistant->is_active ? 'translate-x-6' : 'translate-x-1' }}"></span>
-                    </button>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-xs text-gray-400">1 document</span>
+                        <button 
+                            type="button"
+                            class="relative inline-flex h-5 w-9 items-center rounded-full bg-blue-600 transition-colors"
+                        >
+                            <span class="inline-block h-3 w-3 transform rounded-full bg-white translate-x-5"></span>
+                        </button>
+                    </div>
                 </div>
             </div>
+
+            <!-- OpenAI Integration -->
+            <div class="p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-shrink-0">
+                            <x-heroicon-s-cube class="w-6 h-6 text-blue-600" />
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h3 class="text-sm font-medium text-gray-900 dark:text-white">OpenAI Integration</h3>
+                                <span class="text-xs text-green-600 font-medium">Fully Synced</span>
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">AI Assistant State & Sync Information</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button 
+                            type="button"
+                            class="relative inline-flex h-5 w-9 items-center rounded-full bg-blue-600 transition-colors"
+                        >
+                            <span class="inline-block h-3 w-3 transform rounded-full bg-white translate-x-5"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sync Status -->
+            <div class="p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-shrink-0">
+                            <x-heroicon-s-arrow-path class="w-6 h-6 text-green-600" />
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h3 class="text-sm font-medium text-gray-900 dark:text-white">Sync Status</h3>
+                                <span class="text-xs text-green-600 font-medium">Fully Synced</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button 
+                            type="button"
+                            class="relative inline-flex h-5 w-9 items-center rounded-full bg-blue-600 transition-colors"
+                        >
+                            <span class="inline-block h-3 w-3 transform rounded-full bg-white translate-x-5"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Assistant (User's Personal Assistant) -->
+            @if($assistant)
+            <div class="p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-shrink-0">
+                            <x-heroicon-s-cpu-chip class="w-6 h-6 text-green-600" />
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h3 class="text-sm font-medium text-gray-900 dark:text-white">AI Assistant</h3>
+                                <span class="text-xs text-green-600 font-medium">{{ $assistant->is_active ? 'Created' : 'Inactive' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button wire:click="editAssistant" class="text-xs text-gray-400 hover:text-gray-600">Edit</button>
+                        <button wire:click="deleteAssistant" wire:confirm="Delete assistant?" class="text-xs text-gray-400 hover:text-red-600">Delete</button>
+                        <button 
+                            wire:click="toggleAssistant"
+                            type="button"
+                            class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {{ $assistant->is_active ? 'bg-blue-600' : 'bg-gray-200' }}"
+                        >
+                            <span class="inline-block h-3 w-3 transform rounded-full bg-white transition-transform {{ $assistant->is_active ? 'translate-x-5' : 'translate-x-1' }}"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            <!-- Knowledge Base -->
+            <div class="p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-shrink-0">
+                            <x-heroicon-s-document-text class="w-6 h-6 text-blue-600" />
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h3 class="text-sm font-medium text-gray-900 dark:text-white">Knowledge Base</h3>
+                                <span class="text-xs text-green-600 font-medium">Ready</span>
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Documents Status</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-xs text-blue-600">1 Synced</span>
+                        <button 
+                            type="button"
+                            class="relative inline-flex h-5 w-9 items-center rounded-full bg-blue-600 transition-colors"
+                        >
+                            <span class="inline-block h-3 w-3 transform rounded-full bg-white translate-x-5"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
     @endif
