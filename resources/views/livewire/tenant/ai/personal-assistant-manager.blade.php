@@ -127,11 +127,24 @@
                 <!-- Sync Status -->
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-2">
-                        <div class="w-2 h-2 {{ $assistant->hasUploadedFiles() ? 'bg-green-400' : 'bg-yellow-400' }} rounded-full"></div>
+                        @php
+                            $allSynced = true;
+                            if ($assistant->hasUploadedFiles()) {
+                                foreach ($assistant->uploaded_files as $file) {
+                                    if (!isset($file['synced']) || !$file['synced']) {
+                                        $allSynced = false;
+                                        break;
+                                    }
+                                }
+                            } else {
+                                $allSynced = false;
+                            }
+                        @endphp
+                        <div class="w-2 h-2 {{ $allSynced ? 'bg-green-400' : 'bg-yellow-400' }} rounded-full"></div>
                         <span class="text-sm text-gray-700 dark:text-gray-300">Sync Status</span>
                     </div>
-                    <span class="text-xs font-medium {{ $assistant->hasUploadedFiles() ? 'text-green-600 bg-green-50' : 'text-yellow-600 bg-yellow-50' }} px-2 py-1 rounded">
-                        {{ $assistant->hasUploadedFiles() ? '100% Synced' : '0% Synced' }}
+                    <span class="text-xs font-medium {{ $allSynced ? 'text-green-600 bg-green-50' : 'text-yellow-600 bg-yellow-50' }} px-2 py-1 rounded">
+                        {{ $allSynced ? '100% Synced' : '0% Synced' }}
                     </span>
                 </div>
 
@@ -162,12 +175,37 @@
             <div class="border-t border-gray-200 dark:border-gray-700 pt-3">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Documents Status</span>
-                    <span class="text-xs text-gray-500">1 total</span>
+                    <span class="text-xs text-gray-500">{{ $assistant->hasUploadedFiles() ? $assistant->getFileCount() : 0 }} total</span>
                 </div>
+                @php
+                    $syncedCount = 0;
+                    $pendingCount = 0;
+                    if ($assistant->hasUploadedFiles()) {
+                        foreach ($assistant->uploaded_files as $file) {
+                            if (isset($file['synced']) && $file['synced']) {
+                                $syncedCount++;
+                            } else {
+                                $pendingCount++;
+                            }
+                        }
+                    }
+                @endphp
+                
+                @if($syncedCount > 0)
+                <div class="bg-green-50 dark:bg-green-900/20 rounded px-3 py-2 mb-1">
+                    <span class="text-xs font-medium text-green-700 dark:text-green-400">{{ $syncedCount }} Synced</span>
+                </div>
+                @endif
+                
+                @if($pendingCount > 0)
                 <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded px-3 py-2">
-                    <span class="text-xs font-medium text-yellow-700 dark:text-yellow-400">1 Pending</span>
+                    <span class="text-xs font-medium text-yellow-700 dark:text-yellow-400">{{ $pendingCount }} Pending</span>
                 </div>
-            </div>
+                @elseif($syncedCount == 0 && !$assistant->hasUploadedFiles())
+                <div class="bg-gray-50 dark:bg-gray-900/20 rounded px-3 py-2">
+                    <span class="text-xs font-medium text-gray-700 dark:text-gray-400">No documents</span>
+                </div>
+                @endif
         </div>
 
         <!-- Action Buttons -->

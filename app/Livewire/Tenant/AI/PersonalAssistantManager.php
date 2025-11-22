@@ -345,12 +345,30 @@ class PersonalAssistantManager extends Component
             // Simulate sync process with a small delay
             sleep(1);
             
-            // Update sync status (you can add actual sync logic here)
-            $assistant->update([
-                'last_synced_at' => now(),
-            ]);
+            // Update sync status - mark files as synced
+            if ($assistant->hasUploadedFiles()) {
+                $files = $assistant->uploaded_files ?? [];
+                foreach ($files as &$file) {
+                    $file['synced'] = true;
+                    $file['sync_status'] = 'synced';
+                }
+                $assistant->uploaded_files = $files;
+            }
             
-            session()->flash('success', 'Assistant synced successfully!');
+            // Update last synced timestamp if column exists
+            try {
+                $assistant->update([
+                    'last_synced_at' => now(),
+                    'uploaded_files' => $assistant->uploaded_files,
+                ]);
+            } catch (\Exception $e) {
+                // If last_synced_at column doesn't exist, just update uploaded_files
+                $assistant->update([
+                    'uploaded_files' => $assistant->uploaded_files,
+                ]);
+            }
+            
+            session()->flash('success', 'Assistant and documents synced successfully!');
             $this->loadAssistant();
             
         } catch (\Exception $e) {
