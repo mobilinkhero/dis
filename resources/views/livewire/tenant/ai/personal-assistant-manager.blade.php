@@ -433,96 +433,84 @@
 
     <!-- Chat Modal -->
     @if($showChatModal && $chattingAssistantId)
-    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity z-50" wire:click="closeChat"></div>
+    <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity z-50" wire:click="closeChat"></div>
     <div class="fixed inset-0 z-50 overflow-y-auto">
         <div class="flex min-h-full items-center justify-center p-4">
-            <div class="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl" wire:click.stop>
+            <div class="relative transform overflow-hidden rounded-xl bg-white dark:bg-gray-800 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-3xl" wire:click.stop>
                 @php
                     $chattingAssistant = $assistants->find($chattingAssistantId);
                 @endphp
                 
-                <!-- Top Bar with Actions -->
-                <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3">
+                <!-- Simplified Header -->
+                <div class="bg-white dark:bg-gray-800 px-6 py-4 border-b border-gray-100 dark:border-gray-700">
                     <div class="flex items-center justify-between">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ $chattingAssistant->name ?? 'SmartFlow AI' }}</h3>
                         <div class="flex items-center space-x-2">
-                            <button class="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600">
+                            <button wire:click="closeChat" class="text-gray-400 hover:text-gray-600 px-3 py-1 text-sm">
                                 <x-heroicon-s-arrow-left class="w-4 h-4 inline mr-1" />
                                 Back to assistant
                             </button>
-                            <button class="px-3 py-1 text-sm bg-red-100 text-red-600 rounded hover:bg-red-200">
-                                <x-heroicon-s-trash class="w-4 h-4 inline mr-1" />
+                            <button class="px-3 py-1.5 text-sm bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center">
+                                <x-heroicon-s-trash class="w-4 h-4 mr-1" />
                                 Clear Chat
                             </button>
-                            <button class="px-3 py-1 text-sm bg-green-100 text-green-600 rounded hover:bg-green-200">
-                                <x-heroicon-s-arrow-path class="w-4 h-4 inline mr-1" />
+                            <button class="px-3 py-1.5 text-sm bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center">
+                                <x-heroicon-s-check-circle class="w-4 h-4 mr-1" />
                                 Synced
                             </button>
-                            <button wire:click="closeChat" class="text-gray-400 hover:text-gray-600">
+                            <button wire:click="closeChat" class="text-gray-400 hover:text-gray-600 ml-2">
                                 <x-heroicon-s-x-mark class="w-5 h-5" />
                             </button>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Chat Header -->
-                <div class="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                                <x-heroicon-s-sparkles class="w-6 h-6 text-white" />
-                            </div>
-                            <div>
-                                <h3 class="text-lg font-semibold text-white">{{ $chattingAssistant->name ?? 'SmartFlow AI' }}</h3>
-                                <p class="text-xs text-white/80">{{ $availableModels[$chattingAssistant->model] ?? 'gpt-3.5-turbo' }}</p>
-                            </div>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <span class="text-xs text-white bg-white/20 px-2 py-1 rounded">
-                                {{ $chattingAssistant->hasUploadedFiles() ? $chattingAssistant->getFileCount() : 1 }} Documents
-                            </span>
-                            <span class="text-xs text-white/80">Online</span>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Knowledge Base Sidebar (Optional - shown on right) -->
-                <div class="flex">
-                    <!-- Chat Messages Area -->
-                    <div class="flex-1">
-                        <div class="h-96 overflow-y-auto p-6 space-y-4 bg-gray-50 dark:bg-gray-900" id="chat-messages">
+                <!-- Main Content Area -->
+                <div class="flex bg-white dark:bg-gray-800">
+                    <!-- Chat Messages and Input Area -->
+                    <div class="flex-1 flex flex-col">
+                        <!-- Purple Header Bar -->
+                        <div class="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-3">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                                    <x-heroicon-s-sparkles class="w-5 h-5 text-white" />
+                                </div>
+                                <div class="flex-1">
+                                    <h4 class="text-white font-medium">{{ $chattingAssistant->name ?? 'SmartFlow AI' }}</h4>
+                                    <p class="text-xs text-white/80">{{ $availableModels[$chattingAssistant->model] ?? 'gpt-3.5-turbo' }}</p>
+                                </div>
+                                <span class="text-xs text-white/80 bg-white/20 px-2 py-1 rounded">
+                                    {{ $chattingAssistant->hasUploadedFiles() ? $chattingAssistant->getFileCount() : 1 }} Documents
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Chat Messages Area -->
+                        <div class="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900" id="chat-messages">
                             @foreach($chatMessages as $message)
-                            <div class="flex {{ $message['role'] === 'user' ? 'justify-end' : 'justify-start' }}">
-                                <div class="flex items-start space-x-3 max-w-2xl">
-                                    @if($message['role'] === 'assistant')
+                            <div class="mb-4">
+                                @if($message['role'] === 'assistant')
+                                <div class="flex items-start space-x-3">
                                     <div class="flex-shrink-0">
                                         <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
                                             <x-heroicon-s-sparkles class="w-5 h-5 text-purple-600" />
                                         </div>
                                     </div>
-                                    @endif
-                                    
-                                    <div class="{{ $message['role'] === 'user' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' }} rounded-lg px-4 py-3">
-                                        @if($message['content'] === 'typing')
-                                        <div class="flex space-x-1">
-                                            <div class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
-                                            <div class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
-                                            <div class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
-                                        </div>
-                                        @else
-                                        <p class="text-sm leading-relaxed">{{ $message['content'] }}</p>
-                                        @endif
-                                        <p class="text-xs {{ $message['role'] === 'user' ? 'text-blue-100' : 'text-gray-400' }} mt-2">{{ $message['timestamp'] }}</p>
+                                    <div class="flex-1">
+                                        <p class="text-sm text-gray-700 dark:text-gray-300">{{ $message['content'] }}</p>
+                                        <p class="text-xs text-gray-400 mt-1">{{ $message['timestamp'] }}</p>
                                     </div>
-                                    
-                                    @if($message['role'] === 'user')
-                                    <div class="flex-shrink-0">
-                                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                            <x-heroicon-s-user class="w-5 h-5 text-blue-600" />
-                                        </div>
-                                    </div>
-                                    @endif
                                 </div>
+                                @else
+                                <div class="flex justify-end">
+                                    <div class="max-w-xs lg:max-w-md">
+                                        <div class="bg-purple-600 text-white rounded-lg px-4 py-2">
+                                            <p class="text-sm">{{ $message['content'] }}</p>
+                                        </div>
+                                        <p class="text-xs text-gray-400 text-right mt-1">{{ $message['timestamp'] }}</p>
+                                    </div>
+                                </div>
+                                @endif
                             </div>
                             @endforeach
                         </div>
@@ -534,52 +522,54 @@
                                     type="text" 
                                     wire:model="currentMessage"
                                     placeholder="Type your message..."
-                                    class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-purple-500 focus:ring-purple-500 text-sm"
+                                    class="flex-1 rounded-lg border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-purple-500 focus:ring-purple-500 text-sm px-4 py-2"
                                     autofocus
                                 >
                                 <button 
                                     type="submit"
-                                    class="bg-purple-600 text-white px-5 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center text-sm font-medium"
+                                    class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center text-sm font-medium"
                                 >
-                                    <x-heroicon-s-paper-airplane class="w-4 h-4 mr-2" />
-                                    Send
+                                    <x-heroicon-s-paper-airplane class="w-4 h-4" />
+                                    <span class="ml-2">Send</span>
                                 </button>
                             </form>
                         </div>
                     </div>
 
-                    <!-- Knowledge Base Panel -->
-                    <div class="w-64 border-l border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-900">
-                        <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center">
-                            <x-heroicon-s-document-text class="w-4 h-4 mr-2" />
-                            Knowledge Base
-                        </h4>
-                        
-                        @if($chattingAssistant && $chattingAssistant->hasUploadedFiles())
-                        <div class="space-y-2">
-                            @foreach($chattingAssistant->getFilesWithStatus() as $file)
-                            <div class="bg-white dark:bg-gray-800 rounded-lg p-2">
-                                <div class="flex items-center space-x-2">
-                                    <x-heroicon-s-document class="w-4 h-4 text-gray-400" />
+                    <!-- Knowledge Base Sidebar -->
+                    <div class="w-72 border-l border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                        <div class="p-4">
+                            <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                                <x-heroicon-s-folder class="w-4 h-4 mr-2" />
+                                Knowledge Base
+                            </h4>
+                            
+                            @if($chattingAssistant && $chattingAssistant->hasUploadedFiles())
+                            <div class="space-y-2">
+                                @foreach($chattingAssistant->getFilesWithStatus() as $file)
+                                <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                    <div class="flex items-start space-x-2">
+                                        <x-heroicon-s-document class="w-4 h-4 text-green-500 mt-0.5" />
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ $file['original_name'] }}</p>
+                                            <p class="text-xs text-green-600 mt-1">Synced</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                @endforeach
+                            </div>
+                            @else
+                            <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                <div class="flex items-start space-x-2">
+                                    <x-heroicon-s-document class="w-4 h-4 text-green-500 mt-0.5" />
                                     <div class="flex-1 min-w-0">
-                                        <p class="text-xs font-medium text-gray-900 dark:text-white truncate">{{ $file['original_name'] }}</p>
-                                        <p class="text-xs text-green-600">Synced</p>
+                                        <p class="text-sm font-medium text-gray-900 dark:text-white">SmartFlow.docx</p>
+                                        <p class="text-xs text-green-600 mt-1">Synced</p>
                                     </div>
                                 </div>
                             </div>
-                            @endforeach
+                            @endif
                         </div>
-                        @else
-                        <div class="bg-white dark:bg-gray-800 rounded-lg p-2">
-                            <div class="flex items-center space-x-2">
-                                <x-heroicon-s-document class="w-4 h-4 text-gray-400" />
-                                <div class="flex-1 min-w-0">
-                                    <p class="text-xs font-medium text-gray-900 dark:text-white">SmartFlow.docx</p>
-                                    <p class="text-xs text-green-600">Synced</p>
-                                </div>
-                            </div>
-                        </div>
-                        @endif
                     </div>
                 </div>
 
