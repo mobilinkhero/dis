@@ -107,6 +107,21 @@ class PersonalAssistant extends Model
     }
 
     /**
+     * Get all assistants for current tenant
+     */
+    public static function getAllForCurrentTenant()
+    {
+        $tenant = static::getCurrentTenant();
+        if (!$tenant) {
+            return collect();
+        }
+
+        return static::where('tenant_id', $tenant->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    /**
      * Create or update assistant for current tenant
      */
     public static function createOrUpdateForTenant(array $data): self
@@ -118,14 +133,8 @@ class PersonalAssistant extends Model
 
         $data['tenant_id'] = $tenant->id;
 
-        // Get existing assistant or create new one
-        $assistant = static::where('tenant_id', $tenant->id)->first();
-
-        if ($assistant) {
-            $assistant->update($data);
-        } else {
-            $assistant = static::create($data);
-        }
+        // Create new assistant (removed the single assistant constraint)
+        $assistant = static::create($data);
 
         return $assistant;
     }

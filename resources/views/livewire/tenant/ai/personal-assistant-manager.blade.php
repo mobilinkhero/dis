@@ -60,147 +60,99 @@
     </div>
     @endif
 
-    <!-- AI Services List -->
+    <!-- AI Assistants Grid -->
     @if(!$showCreateForm)
     <div class="mt-6">
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
-            
-            <!-- SmartFlow AI -->
-            <div class="p-4">
-                <div class="flex items-center justify-between">
+        @if($assistants && $assistants->count() > 0)
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            @foreach($assistants as $assistant)
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
+                <!-- Card Header -->
+                <div class="flex items-start justify-between mb-4">
                     <div class="flex items-center space-x-3">
                         <div class="flex-shrink-0">
-                            <x-heroicon-s-sparkles class="w-6 h-6 text-purple-600" />
-                        </div>
-                        <div>
-                            <div class="flex items-center space-x-2">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-white">SmartFlow AI</h3>
-                                <span class="text-xs text-blue-600 font-medium">Active</span>
+                            <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                                <x-heroicon-s-cpu-chip class="w-6 h-6 text-white" />
                             </div>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">AI intelligent virtual assistant designed to streamline your workflows, provide real-time insights.</p>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                                {{ $assistant->name }}
+                            </h3>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $assistant->is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">
+                                {{ $assistant->is_active ? 'Active' : 'Inactive' }}
+                            </span>
                         </div>
                     </div>
+                    
+                    <!-- Toggle Switch -->
+                    <button 
+                        wire:click="toggleAssistant({{ $assistant->id }})"
+                        type="button"
+                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {{ $assistant->is_active ? 'bg-blue-600' : 'bg-gray-200' }}"
+                    >
+                        <span class="sr-only">{{ $assistant->is_active ? 'Deactivate' : 'Activate' }} assistant</span>
+                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {{ $assistant->is_active ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                    </button>
+                </div>
+
+                <!-- Description -->
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">
+                    {{ $assistant->description ?: 'AI assistant designed to help with various tasks and answer questions.' }}
+                </p>
+
+                <!-- Stats -->
+                <div class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
                     <div class="flex items-center space-x-4">
-                        <span class="text-xs text-gray-400">1 document</span>
-                        <button 
-                            type="button"
-                            class="relative inline-flex h-5 w-9 items-center rounded-full bg-blue-600 transition-colors"
-                        >
-                            <span class="inline-block h-3 w-3 transform rounded-full bg-white translate-x-5"></span>
+                        <span>{{ $availableModels[$assistant->model] ?? $assistant->model }}</span>
+                        @if($assistant->hasUploadedFiles())
+                        <span>{{ $assistant->getFileCount() }} files</span>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Use Case Tags -->
+                @if($assistant->use_case_tags && count($assistant->use_case_tags) > 0)
+                <div class="flex flex-wrap gap-1 mb-4">
+                    @foreach(array_slice($assistant->getUseCaseBadges(), 0, 2) as $badge)
+                    <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                        {{ $badge }}
+                    </span>
+                    @endforeach
+                    @if(count($assistant->getUseCaseBadges()) > 2)
+                    <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                        +{{ count($assistant->getUseCaseBadges()) - 2 }}
+                    </span>
+                    @endif
+                </div>
+                @endif
+
+                <!-- Actions -->
+                <div class="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center space-x-2">
+                        <button wire:click="editSpecificAssistant({{ $assistant->id }})" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                            Edit
                         </button>
+                        <button wire:click="deleteSpecificAssistant({{ $assistant->id }})" wire:confirm="Delete '{{ $assistant->name }}' assistant?" class="text-sm text-red-600 hover:text-red-800 font-medium">
+                            Delete
+                        </button>
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        Created {{ $assistant->created_at->diffForHumans() }}
                     </div>
                 </div>
             </div>
-
-            <!-- OpenAI Integration -->
-            <div class="p-4">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <div class="flex-shrink-0">
-                            <x-heroicon-s-cube class="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div>
-                            <div class="flex items-center space-x-2">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-white">OpenAI Integration</h3>
-                                <span class="text-xs text-green-600 font-medium">Fully Synced</span>
-                            </div>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">AI Assistant State & Sync Information</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <button 
-                            type="button"
-                            class="relative inline-flex h-5 w-9 items-center rounded-full bg-blue-600 transition-colors"
-                        >
-                            <span class="inline-block h-3 w-3 transform rounded-full bg-white translate-x-5"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sync Status -->
-            <div class="p-4">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <div class="flex-shrink-0">
-                            <x-heroicon-s-arrow-path class="w-6 h-6 text-green-600" />
-                        </div>
-                        <div>
-                            <div class="flex items-center space-x-2">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-white">Sync Status</h3>
-                                <span class="text-xs text-green-600 font-medium">Fully Synced</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <button 
-                            type="button"
-                            class="relative inline-flex h-5 w-9 items-center rounded-full bg-blue-600 transition-colors"
-                        >
-                            <span class="inline-block h-3 w-3 transform rounded-full bg-white translate-x-5"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- AI Assistant (User's Personal Assistant) -->
-            @if($assistant)
-            <div class="p-4">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <div class="flex-shrink-0">
-                            <x-heroicon-s-cpu-chip class="w-6 h-6 text-green-600" />
-                        </div>
-                        <div>
-                            <div class="flex items-center space-x-2">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-white">AI Assistant</h3>
-                                <span class="text-xs text-green-600 font-medium">{{ $assistant->is_active ? 'Created' : 'Inactive' }}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <button wire:click="editAssistant" class="text-xs text-gray-400 hover:text-gray-600">Edit</button>
-                        <button wire:click="deleteAssistant" wire:confirm="Delete assistant?" class="text-xs text-gray-400 hover:text-red-600">Delete</button>
-                        <button 
-                            wire:click="toggleAssistant"
-                            type="button"
-                            class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {{ $assistant->is_active ? 'bg-blue-600' : 'bg-gray-200' }}"
-                        >
-                            <span class="inline-block h-3 w-3 transform rounded-full bg-white transition-transform {{ $assistant->is_active ? 'translate-x-5' : 'translate-x-1' }}"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            @endif
-
-            <!-- Knowledge Base -->
-            <div class="p-4">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <div class="flex-shrink-0">
-                            <x-heroicon-s-document-text class="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div>
-                            <div class="flex items-center space-x-2">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-white">Knowledge Base</h3>
-                                <span class="text-xs text-green-600 font-medium">Ready</span>
-                            </div>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Documents Status</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <span class="text-xs text-blue-600">1 Synced</span>
-                        <button 
-                            type="button"
-                            class="relative inline-flex h-5 w-9 items-center rounded-full bg-blue-600 transition-colors"
-                        >
-                            <span class="inline-block h-3 w-3 transform rounded-full bg-white translate-x-5"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
+            @endforeach
         </div>
+        @else
+        <div class="text-center py-12">
+            <x-heroicon-o-cpu-chip class="mx-auto h-12 w-12 text-gray-400" />
+            <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No AI Assistants</h3>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Get started by creating your first AI assistant.
+            </p>
+        </div>
+        @endif
     </div>
     @endif
 

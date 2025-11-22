@@ -14,8 +14,10 @@ class PersonalAssistantManager extends Component
     use WithFileUploads;
 
     public $assistant;
+    public $assistants;
     public $showCreateForm = false;
     public $files = [];
+    public $editingAssistantId = null;
     
     // Form fields
     public $name = '';
@@ -84,7 +86,9 @@ class PersonalAssistantManager extends Component
 
     public function loadAssistant()
     {
-        $this->assistant = PersonalAssistant::getForCurrentTenant();
+        // Load all assistants for current tenant instead of just one
+        $this->assistants = PersonalAssistant::getAllForCurrentTenant();
+        $this->assistant = $this->assistants->first(); // For compatibility with existing form logic
         
         if ($this->assistant) {
             $this->name = $this->assistant->name;
@@ -242,18 +246,20 @@ class PersonalAssistantManager extends Component
         session()->flash('success', 'File status refreshed');
     }
 
-    public function toggleAssistant()
+    public function toggleAssistant($assistantId = null)
     {
-        if (!$this->assistant) {
+        $assistant = $assistantId ? PersonalAssistant::find($assistantId) : $this->assistant;
+        
+        if (!$assistant) {
             return;
         }
 
         try {
-            $this->assistant->update([
-                'is_active' => !$this->assistant->is_active
+            $assistant->update([
+                'is_active' => !$assistant->is_active
             ]);
             
-            $status = $this->assistant->is_active ? 'activated' : 'deactivated';
+            $status = $assistant->is_active ? 'activated' : 'deactivated';
             session()->flash('success', "Assistant {$status} successfully!");
             
             // Refresh the assistant data
@@ -261,6 +267,51 @@ class PersonalAssistantManager extends Component
             
         } catch (\Exception $e) {
             session()->flash('error', 'Failed to toggle assistant: ' . $e->getMessage());
+        }
+    }
+
+    public function editSpecificAssistant($assistantId)
+    {
+        $assistant = PersonalAssistant::find($assistantId);
+        if (!$assistant) {
+            return;
+        }
+        
+        $this->editingAssistantId = $assistantId;
+        $this->assistant = $assistant;
+        
+        $this->name = $assistant->name;
+        $this->description = $assistant->description;
+        $this->system_instructions = $assistant->system_instructions;
+        $this->model = $assistant->model;
+        $this->temperature = $assistant->temperature;
+        $this->max_tokens = $assistant->max_tokens;
+        $this->use_case_tags = $assistant->use_case_tags ?? [];
+        $this->file_analysis_enabled = $assistant->file_analysis_enabled;
+        
+        $this->showCreateForm = true;
+    }
+
+    public function deleteSpecificAssistant($assistantId)
+    {
+        $assistant = PersonalAssistant::find($assistantId);
+        if (!$assistant) {
+            return;
+        }
+
+        try {
+            // Clear all files first
+            $fileService = new PersonalAssistantFileService();
+            $fileService->clearAllFiles($assistant);
+            
+            // Delete assistant
+            $assistant->delete();
+            
+            session()->flash('success', 'Assistant deleted successfully!');
+            $this->loadAssistant();
+            
+        } catch (\Exception $e) {
+            session()->flash('error', 'Failed to delete assistant: ' . $e->getMessage());
         }
     }
 
