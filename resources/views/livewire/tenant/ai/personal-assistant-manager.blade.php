@@ -60,75 +60,133 @@
     </div>
     @endif
 
-    <!-- AI Assistants Grid -->
-    @if(!$showCreateForm)
-    <div class="mt-6">
-        @if($assistants && $assistants->count() > 0)
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            @foreach($assistants as $assistant)
-            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-                <!-- Header: Title and Toggle -->
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-                        {{ $assistant->name }}
-                    </h3>
-                    <button 
-                        wire:click="toggleAssistant({{ $assistant->id }})"
-                        type="button"
-                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {{ $assistant->is_active ? 'bg-blue-600' : 'bg-gray-300' }}"
-                    >
-                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {{ $assistant->is_active ? 'translate-x-6' : 'translate-x-1' }}"></span>
-                    </button>
-                </div>
-
-                <!-- Status -->
-                <div class="mb-3">
-                    <span class="text-sm font-medium {{ $assistant->is_active ? 'text-green-600' : 'text-gray-500' }}">
-                        {{ $assistant->is_active ? 'Active' : 'Inactive' }}
-                    </span>
-                </div>
-
-                <!-- Description -->
-                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    {{ $assistant->description ?: 'This helps with sales' }}
-                </p>
-
-                <!-- Model and Files Info -->
-                <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    {{ $availableModels[$assistant->model] ?? $assistant->model }}
-                    @if($assistant->hasUploadedFiles())
-                    {{ $assistant->getFileCount() }} files
-                    @else
-                    0 files
-                    @endif
-                </div>
-
-                <!-- Actions and Timestamp -->
-                <div class="flex items-center justify-between text-sm">
-                    <div class="flex items-center space-x-2">
-                        <button wire:click="editSpecificAssistant({{ $assistant->id }})" class="text-blue-600 hover:text-blue-800">
-                            Edit
-                        </button>
-                        <button wire:click="deleteSpecificAssistant({{ $assistant->id }})" wire:confirm="Delete '{{ $assistant->name }}' assistant?" class="text-red-600 hover:text-red-800">
-                            Delete
-                        </button>
-                    </div>
-                    <span class="text-gray-400 text-xs">
-                        Created {{ $assistant->created_at->diffForHumans() }}
-                    </span>
+    <!-- AI Assistant Card -->
+    @if(!$showCreateForm && $assistants && $assistants->count() > 0)
+    @foreach($assistants as $assistant)
+    <div class="mt-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-md">
+        <!-- Header with Icon and Title -->
+        <div class="flex items-start space-x-3 mb-4">
+            <div class="flex-shrink-0">
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <x-heroicon-s-sparkles class="w-6 h-6 text-purple-600" />
                 </div>
             </div>
-            @endforeach
+            <div class="flex-1">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ $assistant->name }}</h3>
+                        <div class="flex items-center space-x-2 mt-1">
+                            <span class="text-xs font-medium text-green-600">Active</span>
+                            <span class="text-xs text-gray-500">{{ $availableModels[$assistant->model] ?? 'gpt-4o-mini' }}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-gray-500">Active</span>
+                        <button 
+                            wire:click="toggleAssistant({{ $assistant->id }})"
+                            type="button"
+                            class="relative inline-flex h-6 w-11 items-center rounded-full bg-purple-600 transition-colors"
+                        >
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
-        @else
-        <div class="text-center py-12">
-            <x-heroicon-o-cpu-chip class="mx-auto h-12 w-12 text-gray-400" />
-            <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No AI Assistants</h3>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Get started by creating your first AI assistant.
-            </p>
+
+        <!-- Description -->
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            {{ $assistant->description ?: 'An intelligent virtual assistant designed to streamline your workflows, provide real-time insights,...' }}
+        </p>
+
+        <!-- Document Count -->
+        <div class="flex items-center space-x-2 mb-6">
+            <x-heroicon-o-document class="w-4 h-4 text-gray-400" />
+            <span class="text-sm text-gray-600">{{ $assistant->hasUploadedFiles() ? $assistant->getFileCount() : 1 }} document</span>
         </div>
-        @endif
+
+        <!-- Expandable Sections -->
+        <div class="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+            <!-- OpenAI Integration -->
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <x-heroicon-s-cube class="w-5 h-5 text-blue-600" />
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-900 dark:text-white">OpenAI Integration</h4>
+                            <p class="text-xs text-gray-500">AI Assistant Status & Sync Information</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Items -->
+            <div class="space-y-3">
+                <!-- Sync Status -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Sync Status</span>
+                    </div>
+                    <span class="text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-1 rounded">0% Synced</span>
+                </div>
+
+                <!-- AI Assistant -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">AI Assistant</span>
+                    </div>
+                    <span class="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">Created</span>
+                </div>
+
+                <!-- Knowledge Base -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-gray-400 rounded-full"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Knowledge Base</span>
+                    </div>
+                    <span class="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">Pending</span>
+                </div>
+            </div>
+
+            <!-- Documents Status -->
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Documents Status</span>
+                    <span class="text-xs text-gray-500">1 total</span>
+                </div>
+                <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded px-3 py-2">
+                    <span class="text-xs font-medium text-yellow-700 dark:text-yellow-400">1 Pending</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center space-x-3 mt-6">
+            <button class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center">
+                <x-heroicon-s-chat-bubble-left-right class="w-4 h-4 mr-2" />
+                Chat
+            </button>
+            <button class="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors">
+                Sync Now
+            </button>
+            <button class="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                <x-heroicon-s-cog-6-tooth class="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            </button>
+            <button wire:click="deleteSpecificAssistant({{ $assistant->id }})" wire:confirm="Delete assistant?" class="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors">
+                <x-heroicon-s-trash class="w-5 h-5 text-red-600 dark:text-red-400" />
+            </button>
+        </div>
+    </div>
+    @endforeach
+    @elseif(!$showCreateForm)
+    <div class="text-center py-12">
+        <x-heroicon-o-cpu-chip class="mx-auto h-12 w-12 text-gray-400" />
+        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No AI Assistants</h3>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Get started by creating your first AI assistant.
+        </p>
     </div>
     @endif
 
