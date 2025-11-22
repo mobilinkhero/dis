@@ -66,80 +66,56 @@
         @if($assistants && $assistants->count() > 0)
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach($assistants as $assistant)
-            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
-                <!-- Card Header -->
-                <div class="flex items-start justify-between mb-4">
-                    <div class="flex items-center space-x-3">
-                        <div class="flex-shrink-0">
-                            <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                                <x-heroicon-s-cpu-chip class="w-6 h-6 text-white" />
-                            </div>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                                {{ $assistant->name }}
-                            </h3>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $assistant->is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">
-                                {{ $assistant->is_active ? 'Active' : 'Inactive' }}
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <!-- Toggle Switch -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                <!-- Header: Title and Toggle -->
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        {{ $assistant->name }}
+                    </h3>
                     <button 
                         wire:click="toggleAssistant({{ $assistant->id }})"
                         type="button"
-                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {{ $assistant->is_active ? 'bg-blue-600' : 'bg-gray-200' }}"
+                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {{ $assistant->is_active ? 'bg-blue-600' : 'bg-gray-300' }}"
                     >
-                        <span class="sr-only">{{ $assistant->is_active ? 'Deactivate' : 'Activate' }} assistant</span>
                         <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {{ $assistant->is_active ? 'translate-x-6' : 'translate-x-1' }}"></span>
                     </button>
                 </div>
 
+                <!-- Status -->
+                <div class="mb-3">
+                    <span class="text-sm font-medium {{ $assistant->is_active ? 'text-green-600' : 'text-gray-500' }}">
+                        {{ $assistant->is_active ? 'Active' : 'Inactive' }}
+                    </span>
+                </div>
+
                 <!-- Description -->
-                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">
-                    {{ $assistant->description ?: 'AI assistant designed to help with various tasks and answer questions.' }}
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    {{ $assistant->description ?: 'This helps with sales' }}
                 </p>
 
-                <!-- Stats -->
-                <div class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    <div class="flex items-center space-x-4">
-                        <span>{{ $availableModels[$assistant->model] ?? $assistant->model }}</span>
-                        @if($assistant->hasUploadedFiles())
-                        <span>{{ $assistant->getFileCount() }} files</span>
-                        @endif
-                    </div>
-                </div>
-
-                <!-- Use Case Tags -->
-                @if($assistant->use_case_tags && count($assistant->use_case_tags) > 0)
-                <div class="flex flex-wrap gap-1 mb-4">
-                    @foreach(array_slice($assistant->getUseCaseBadges(), 0, 2) as $badge)
-                    <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                        {{ $badge }}
-                    </span>
-                    @endforeach
-                    @if(count($assistant->getUseCaseBadges()) > 2)
-                    <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600">
-                        +{{ count($assistant->getUseCaseBadges()) - 2 }}
-                    </span>
+                <!-- Model and Files Info -->
+                <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    {{ $availableModels[$assistant->model] ?? $assistant->model }}
+                    @if($assistant->hasUploadedFiles())
+                    {{ $assistant->getFileCount() }} files
+                    @else
+                    0 files
                     @endif
                 </div>
-                @endif
 
-                <!-- Actions -->
-                <div class="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+                <!-- Actions and Timestamp -->
+                <div class="flex items-center justify-between text-sm">
                     <div class="flex items-center space-x-2">
-                        <button wire:click="editSpecificAssistant({{ $assistant->id }})" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                        <button wire:click="editSpecificAssistant({{ $assistant->id }})" class="text-blue-600 hover:text-blue-800">
                             Edit
                         </button>
-                        <button wire:click="deleteSpecificAssistant({{ $assistant->id }})" wire:confirm="Delete '{{ $assistant->name }}' assistant?" class="text-sm text-red-600 hover:text-red-800 font-medium">
+                        <button wire:click="deleteSpecificAssistant({{ $assistant->id }})" wire:confirm="Delete '{{ $assistant->name }}' assistant?" class="text-red-600 hover:text-red-800">
                             Delete
                         </button>
                     </div>
-                    <div class="text-xs text-gray-500">
+                    <span class="text-gray-400 text-xs">
                         Created {{ $assistant->created_at->diffForHumans() }}
-                    </div>
+                    </span>
                 </div>
             </div>
             @endforeach
